@@ -6,6 +6,8 @@ import networkx as nx
 import hypernetx as hnx
 import numpy as np
 import matplotlib.pyplot as plt
+import hypconstruct
+from scipy.optimize import linprog
 
 
 def hypergraph_degree_mat(H):
@@ -62,7 +64,7 @@ def weighted_to_measure(f, H):
 def compute_edge_info(f, H, debug=False):
     """
     Given a hypergraph H and weighted vector f, compute a dictionary with the following information for each edge in H:
-        (Ie, Se, max_{u, v \in e} (f(u) - f(v))
+        (Ie, Se, max_{u, v \in e} (f(u) - f(v), [vertices])
     :param f: A vector in the normalised space
     :param H: The underlying hypergraph
     :return: a dictionary with the above information for each edge in the hypergraph.
@@ -116,7 +118,7 @@ def compute_edge_info(f, H, debug=False):
                 Se.append(v)
             if debug:
                 print("Ie", Ie, "Se", Se)
-        edge_info[e.uid] = (Ie, Se, maxe - mine)
+        edge_info[e.uid] = (Ie, Se, maxe - mine, e.elements)
     if debug:
         print("Returning:", edge_info)
     return edge_info
@@ -169,10 +171,135 @@ def powerset(s):
         yield [ss for mask, ss in zip(masks, s) if i & mask]
 
 
+def find_densest_subset(U, H, edge_info, debug=False):
+    """
+    Given a set of vertices U, find the densest subset as per section 4.2 of the original paper.
+    :param U: the vertex level-set
+    :param H: the underlying hypergraph
+    :param edge_info: the pre-computed information about every edge in the graph
+    :param debug: whether to make debug logs
+    :return:
+    """
+    if debug:
+        print("Finding densest subgraph for", U)
+    # We will solve this problem using the linear program given in the original paper.
+    # First, we need to compute the sets I and S.
+    I = []
+    S = []
+    for e, einfo in edge_info.items():
+        # Check whether the edge maximum/minimum set has a non-zero intersection with U
+        if len([v for v in U if v in einfo[1]]) > 0:
+            S.append(e)
+        if len([v for v in U if v in einfo[0]]) > 0:
+            I.append(e)
+
+    if debug:
+        print('I', I, 'S', S)
+
+    # If I and S are both empty, then we can return with zero weight
+    if len(I) + len(S) == 0:
+        best_P = np.copy(U)
+        max_delta = 0
+        if debug:
+            print("Returning early since I and S are empty")
+            print("best_P:", best_P)
+            print("max_delta:", max_delta)
+        return best_P, max_delta
+
+    # Now, we construct the linear program.
+    # The variables are as follows:
+    #   x_e for each e in I \union S
+    #   y_v for each v in U
+    num_vars = len(I) + len(S) + len(U)
+
+    # The objective function to be minimised is
+    #    -c(x) = - sum_{I} c_e x_e + sum_{S} c_e x_e
+    obj = np.zeros(num_vars)
+    i = 0
+    for e in I:
+        obj[i] = -edge_info[e][2]
+        i += 1
+    for e in S:
+        obj[i] = edge_info[e][2]
+        i += 1
+    if debug:
+        print("obj", obj)
+
+    # The equality constraints are
+    #    sum_{v \in U} w_v y_v = 1
+    lhs_eq = [np.zeros(num_vars)]
+    rhs_eq = 1
+    for i, v in enumerate(U):
+        lhs_eq[0][len(I) + len(S) + i] = H.degree(v)
+    if debug:
+        print('lhs_eq', lhs_eq)
+
+    # The inequality constraints are:
+    #   x_e - y_v \leq 0    for all e \in I, v \in e
+    #   y_v - x_e \leq 0    for all e \in S, v \in e
+    lhs_ineq = []
+    rhs_ineq = []
+    edge_index = -1
+    for e in I:
+        edge_index += 1
+        for v in edge_info[e][3]:
+            if v in U:
+                # Construct the left hand side of the inequality in terms of the coefficients.
+                lhs = np.zeros(num_vars)
+                vert_index = len(I) + len(S) + U.index(v)
+                lhs[edge_index] = 1
+                lhs[vert_index] = -1
+
+                # Add this inequality to the lists
+                if debug:
+                    print(f"Added inequality: {e} - {v} < 0")
+                lhs_ineq.append(lhs)
+                rhs_ineq.append(0)
+    for e in S:
+        edge_index += 1
+        for v in edge_info[e][3]:
+            if v in U:
+                # Construct the left hand side of the inequality in terms of the coefficients.
+                lhs = np.zeros(num_vars)
+                vert_index = len(I) + len(S) + U.index(v)
+                lhs[edge_index] = -1
+                lhs[vert_index] = 1
+
+                # Add this inequality to the lists
+                if debug:
+                    print(f"Added inequality: {v} - {e} < 0")
+                lhs_ineq.append(lhs)
+                rhs_ineq.append(0)
+
+    # Now, solve the linear program.
+    opt = linprog(c=obj, A_ub=lhs_ineq, b_ub=rhs_ineq, A_eq=lhs_eq, b_eq=rhs_eq)
+    if debug:
+        print(opt)
+
+    # Find a level set of the output of the linear program.
+    max_delta = -np.round(opt.fun, decimals=5)
+    soln = np.round(opt.x, decimals=5)
+    thresh = 0
+    for i in range(len(U)):
+        if soln[len(I) + len(S) + i] > thresh:
+            thresh = soln[len(I) + len(S) + i]
+    if debug:
+        print("thresh:", thresh)
+    best_P = []
+    for i in range(len(U)):
+        if soln[len(I) + len(S) + i] >= thresh:
+            best_P.append(U[i])
+
+    if debug:
+        print("best_P:", best_P)
+        print("max_delta:", max_delta)
+    return best_P, max_delta
+
+
 # ====================================================
 # Compute the hypergraph laplacian for a given vector
 # ====================================================
-def weighted_diffusion_gradient(f, H):
+def weighted_diffusion_gradient(f, H, debug=False):
     """
     Given a vector in the weighted space, compute the gradient
          r = df/dt
@@ -205,6 +332,9 @@ def weighted_diffusion_gradient(f, H):
             # This is the first time we've seen this value
             equiv_classes[f[vidx]] = [vname]
 
+    if debug:
+        print("Equivalence classes:", equiv_classes)
+
     # We now iterate through the equivalence classes for the remainder of the algorithm
     for _, U in equiv_classes.items():
         Utemp = U
@@ -215,29 +345,29 @@ def weighted_diffusion_gradient(f, H):
         # For now, we will iterate over all possible subsets (!!) - this is exponential though! For small graphs it
         # should at least work, and I can come back later to optimise.
         while len(Utemp) > 0:
-            max_delta = -len(edge_info)
-            best_P = []
-            for P in powerset(U):
-                if delta(U, edge_info, H) > max_delta:
-                    max_delta = delta(P, edge_info, H)
-                    best_P = P
+            best_P, max_delta = find_densest_subset(Utemp, H, edge_info, debug=debug)
 
             # Update the r value for the best vertices and remove them from Utemp
             for v in best_P:
                 r[vname_to_vidx[v]] = max_delta
                 Utemp.remove(v)
+    if debug:
+        print("Complete Gradient:", r)
     return r
 
 
-def hypergraph_laplacian(phi, H):
+def hypergraph_measure_laplacian(phi, H, debug=False):
     """
-    Apply the hypergraph laplacian operator to a vector phi in the measure space
+    Apply the hypergraph laplacian operator to a vector phi in the measure space.
+    In the normal language of graphs, this laplacian would be written as:
+       L = I - A D^{-1}
+    It can be considered to be the 'random walk' laplacian.
     :param phi: The vector to apply the laplacian operator to.
     :param H: The underlying hypergraph
     :return: L_H x
     """
     f = measure_to_weighted(phi, H)
-    r = weighted_diffusion_gradient(f, H)
+    r = weighted_diffusion_gradient(f, H, debug=debug)
     return -hypergraph_degree_mat(H) @ r
 
 
@@ -271,7 +401,7 @@ def hypergraph_lap_conn_graph(phi, H):
     return G
 
 
-def hyp_plot_conn_graph(phi, H):
+def hyp_plot_conn_graph(phi, H, show_hyperedges=True):
     """
     Plot the pagerank connectivity graph along with the hypergraph.
     :param phi:
@@ -282,10 +412,36 @@ def hyp_plot_conn_graph(phi, H):
 
     # Get the positioning of the nodes for drawing the hypergrpah
     pos = hnx.drawing.rubber_band.layout_node_link(H, layout=nx.spring_layout)
-    hnx.drawing.rubber_band.draw(H, pos=pos)
+    ax = plt.gca()
+    if show_hyperedges:
+        hnx.drawing.rubber_band.draw(H, pos=pos)
+    else:
+        # Get the node radius (taken from hypernetx code)
+        r0 = hnx.drawing.rubber_band.get_default_radius(H, pos)
+        a0 = np.pi * r0 ** 2
+        def get_node_radius(v):
+            return np.sqrt(a0 * (len(v) if type(v) == frozenset else 1) / np.pi)
+        node_radius = {
+            v: get_node_radius(v)
+            for v in H.nodes
+        }
+
+        # Draw stuff
+        hnx.drawing.rubber_band.draw_hyper_nodes(H, pos=pos, ax=ax, node_radius=node_radius)
+        hnx.drawing.rubber_band.draw_hyper_labels(H, pos=pos, ax=ax, node_radius=node_radius)
+
+        # Set the axes (taken from hypernetx code)
+        if len(H.nodes) == 1:
+            x, y = pos[list(H.nodes)[0]]
+            s = 20
+            ax.axis([x - s, x + s, y - s, y + s])
+        else:
+            ax.axis('equal')
+        ax.axis('off')
+
+    # Draw the edges only from the connectivity graph.
     nx.draw_networkx_edges(G, pos=pos)
     plt.show()
-
 
 
 # =======================================================
@@ -303,14 +459,15 @@ def sim_lap_heat_diff(phi, H, T=1, step=0.1):
     x_t = phi
     for t in np.linspace(0, T, int(T/step)):
         print(x_t)
-        grad = -hypergraph_laplacian(x_t, H)
+        grad = -hypergraph_measure_laplacian(x_t, H)
         x_t += step * grad
     return x_t
 
 
-def sim_hyp_pagerank(alpha, s, phi0, H, max_iters=1000, step=0.01):
+def sim_hyp_pagerank(alpha, s, phi0, H, max_iters=1000, step=0.01, debug=False, check_converge=True):
     """
-    Compute an approximation of the hypergraph pagerank.
+    Compute an approximation of the hypergraph pagerank. Note that the pagerank is defined with respect to the
+    normalised vector.
     :param alpha: As in definition of pagerank. (the teleport probability)
     :param s: The teleport vector.
     :param phi0: The starting vector, in the measure space
@@ -324,27 +481,53 @@ def sim_hyp_pagerank(alpha, s, phi0, H, max_iters=1000, step=0.01):
     converged = False
     while not converged and total_iterations < max_iters:
         total_iterations += 1
-        grad = beta * (s - x_t) - (1 - beta) * hypergraph_laplacian(x_t, H)
+        print(x_t)
+        if debug:
+            print("iteration", total_iterations)
+        grad = beta * (s - x_t) - (1 - beta) * hypergraph_measure_laplacian(x_t, H, debug=debug)
+        if debug:
+            print("Pagerank gradient:", grad)
         x_old = np.copy(x_t)
         x_t += step * grad
 
         # Check for convergence
-        if np.sum(np.abs(x_old - x_t)) < (0.00001 * n):
+        if check_converge and np.sum(np.abs(x_old - x_t)) < (0.00001 * n):
             converged = True
-            print("Pagerank converged.")
+            print("Pagerank converged. Iterations:", total_iterations)
     return x_t
+
+
+def check_pagerank(alpha, pr, H):
+    test = pr + ((1 - alpha) / (2 * alpha)) * hypergraph_measure_laplacian(pr, H)
+    print("Pagerank test:", np.round(test, decimals=2))
 
 
 if __name__ == "__main__":
     # Construct an example hypergraph
-    H = hnx.Hypergraph({'e1': [1, 2, 3], 'e2': [1, 3, 4, 5, 6], 'e3': [3, 6]})
+    # H = hnx.Hypergraph({'e1': [1, 2, 3], 'e2': [1, 3, 4, 5, 6], 'e3': [3, 6]})
+    # H = hnx.Hypergraph({'e1': [1, 2, 3], 'e2': [1, 2, 4], 'e3': [3, 4]})
+    n = 20
+    H = hypconstruct.construct_hyp_low_cond(int(n/2), int(n/2), int(n*1.5), 3, 0.1, 0.5)
+    # H = hnx.Hypergraph({'e1': [1, 2, 3], 'e2': [4, 5, 6]})
+
+    # Get the mapping from node names to indices
+    vname_to_vidx = {}
+    for vidx, vname in enumerate(H.nodes):
+        vname_to_vidx[vname] = vidx
 
     # Create a starting vector
-    phi = np.ones(6)
+    s = np.zeros(n)
+    s[vname_to_vidx['a1']] = 1
+    phi = np.copy(s)
     f = measure_to_weighted(phi, H)
     x = measure_to_normalized(phi, H)
 
-    phi_end = sim_hyp_pagerank(0.8, np.array([1, 0, 0, 0, 0, 0]), phi, H)
-    print("pagerank", phi_end)
-    hyp_plot_conn_graph(phi_end, H)
-
+    pr = sim_hyp_pagerank(0.2, s, phi, H, debug=False, max_iters=1000, check_converge=True)
+    weighted_pr = measure_to_weighted(pr, H)
+    for i in range(1, int(n/2) + 1):
+        print(f"pr(a{i}) = {pr[vname_to_vidx['a' + str(i)]]}, prw(a{i}) = {weighted_pr[vname_to_vidx['a' + str(i)]]}")
+    for i in range(1, int(n/2) + 1):
+        print(f"pr(b{i}) = {pr[vname_to_vidx['b' + str(i)]]}, prw(b{i}) = {weighted_pr[vname_to_vidx['b' + str(i)]]}")
+    print("pagerank", pr)
+    check_pagerank(0.2, pr, H)
+    hyp_plot_conn_graph(pr, H, show_hyperedges=True)
