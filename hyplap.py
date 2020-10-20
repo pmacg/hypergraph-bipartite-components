@@ -7,6 +7,7 @@ import hypernetx as hnx
 import numpy as np
 import matplotlib.pyplot as plt
 import hypconstruct
+import sys
 from scipy.optimize import linprog
 
 
@@ -479,9 +480,16 @@ def sim_hyp_pagerank(alpha, s, phi0, H, max_iters=1000, step=0.01, debug=False, 
     beta = (2 * alpha) / (1 + alpha)
     total_iterations = 0
     converged = False
+    print("Computing pagerank...")
     while not converged and total_iterations < max_iters:
         total_iterations += 1
-        print(x_t)
+        if not debug:
+            sys.stdout.write('.')
+            if total_iterations % 10 == 0:
+                sys.stdout.flush()
+            if total_iterations % 100 == 0:
+                sys.stdout.write('\n')
+                sys.stdout.flush()
         if debug:
             print("iteration", total_iterations)
         grad = beta * (s - x_t) - (1 - beta) * hypergraph_measure_laplacian(x_t, H, debug=debug)
@@ -493,7 +501,7 @@ def sim_hyp_pagerank(alpha, s, phi0, H, max_iters=1000, step=0.01, debug=False, 
         # Check for convergence
         if check_converge and np.sum(np.abs(x_old - x_t)) < (0.00001 * n):
             converged = True
-            print("Pagerank converged. Iterations:", total_iterations)
+            print("\nPagerank converged. Iterations:", total_iterations)
     return x_t
 
 
@@ -522,12 +530,12 @@ if __name__ == "__main__":
     f = measure_to_weighted(phi, H)
     x = measure_to_normalized(phi, H)
 
-    pr = sim_hyp_pagerank(0.2, s, phi, H, debug=False, max_iters=1000, check_converge=True)
+    pr = sim_hyp_pagerank(0.8, s, phi, H, debug=False, max_iters=1000, check_converge=True)
     weighted_pr = measure_to_weighted(pr, H)
     for i in range(1, int(n/2) + 1):
         print(f"pr(a{i}) = {pr[vname_to_vidx['a' + str(i)]]}, prw(a{i}) = {weighted_pr[vname_to_vidx['a' + str(i)]]}")
     for i in range(1, int(n/2) + 1):
         print(f"pr(b{i}) = {pr[vname_to_vidx['b' + str(i)]]}, prw(b{i}) = {weighted_pr[vname_to_vidx['b' + str(i)]]}")
     print("pagerank", pr)
-    check_pagerank(0.2, pr, H)
-    hyp_plot_conn_graph(pr, H, show_hyperedges=True)
+    check_pagerank(0.8, pr, H)
+    hyp_plot_conn_graph(pr, H, show_hyperedges=False)
