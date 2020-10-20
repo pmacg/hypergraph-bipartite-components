@@ -271,6 +271,23 @@ def hypergraph_lap_conn_graph(phi, H):
     return G
 
 
+def hyp_plot_conn_graph(phi, H):
+    """
+    Plot the pagerank connectivity graph along with the hypergraph.
+    :param phi:
+    :param H:
+    :return:
+    """
+    G = hypergraph_lap_conn_graph(phi, H)
+
+    # Get the positioning of the nodes for drawing the hypergrpah
+    pos = hnx.drawing.rubber_band.layout_node_link(H, layout=nx.spring_layout)
+    hnx.drawing.rubber_band.draw(H, pos=pos)
+    nx.draw_networkx_edges(G, pos=pos)
+    plt.show()
+
+
+
 # =======================================================
 # Simulate the heat diffusion process
 # =======================================================
@@ -291,7 +308,7 @@ def sim_lap_heat_diff(phi, H, T=1, step=0.1):
     return x_t
 
 
-def sim_hyp_pagerank(alpha, s, phi0, H, num_iters=1000, step=0.01):
+def sim_hyp_pagerank(alpha, s, phi0, H, max_iters=1000, step=0.01):
     """
     Compute an approximation of the hypergraph pagerank.
     :param alpha: As in definition of pagerank. (the teleport probability)
@@ -300,12 +317,21 @@ def sim_hyp_pagerank(alpha, s, phi0, H, num_iters=1000, step=0.01):
     :param H: The underlying hypergraph
     :return: The pagerank vector
     """
+    n = len(H.nodes)
     x_t = phi0
     beta = (2 * alpha) / (1 + alpha)
-    for t in np.linspace(0, int(num_iters * step), num_iters):
-        print(x_t)
+    total_iterations = 0
+    converged = False
+    while not converged and total_iterations < max_iters:
+        total_iterations += 1
         grad = beta * (s - x_t) - (1 - beta) * hypergraph_laplacian(x_t, H)
+        x_old = np.copy(x_t)
         x_t += step * grad
+
+        # Check for convergence
+        if np.sum(np.abs(x_old - x_t)) < (0.00001 * n):
+            converged = True
+            print("Pagerank converged.")
     return x_t
 
 
@@ -319,13 +345,6 @@ if __name__ == "__main__":
     x = measure_to_normalized(phi, H)
 
     phi_end = sim_hyp_pagerank(0.8, np.array([1, 0, 0, 0, 0, 0]), phi, H)
-    G = hypergraph_lap_conn_graph(phi_end, H)
-
-    # options = {
-    #     'node_color': 'black',
-    #     'node_size': 100,
-    #     'width': 3,
-    # }
-    nx.draw_networkx(G, with_labels=True)
-    plt.show()
+    print("pagerank", phi_end)
+    hyp_plot_conn_graph(phi_end, H)
 
