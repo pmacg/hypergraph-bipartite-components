@@ -2,8 +2,10 @@
 This file implements methods for using the hypergraph laplacian operator.
 The terminology used in this file comes from the following paper: https://arxiv.org/abs/1605.01483
 """
+import networkx as nx
 import hypernetx as hnx
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def hypergraph_degree_mat(H):
@@ -57,7 +59,7 @@ def weighted_to_measure(f, H):
     return normalized_to_measure(weighted_to_normalized(f, H), H)
 
 
-def compute_edge_info(f, H):
+def compute_edge_info(f, H, debug=False):
     """
     Given a hypergraph H and weighted vector f, compute a dictionary with the following information for each edge in H:
         (Ie, Se, max_{u, v \in e} (f(u) - f(v))
@@ -67,33 +69,56 @@ def compute_edge_info(f, H):
     """
     maxf = max(f)
     minf = min(f)
+    if debug:
+        print('f', f)
+        print('maxf', maxf, 'minf', minf)
     edge_info = {}
 
     # Compute a dictionary of vertex names and vertex ids
     vname_to_vidx = {}
     for vidx, vname in enumerate(H.nodes):
         vname_to_vidx[vname] = vidx
+    if debug:
+        print('vname_to_vidx', vname_to_vidx)
 
     for e in H.edges():
+        if debug:
+            print("Processing edge:", e)
         # Compute the maximum and minimum sets for the edge.
         Ie = []
         mine = maxf
         Se = []
         maxe = minf
         for v in e.elements:
+            if debug:
+                print("Considering vertex:", v)
             fv = f[vname_to_vidx[v]]
+            if debug:
+                print("fv", fv)
+
             if fv < mine:
+                if debug:
+                    print("New minimum.")
                 mine = fv
                 Ie = [v]
-            elif fv > maxe:
+            if fv > maxe:
+                if debug:
+                    print("New maximum.")
                 maxe = fv
                 Se = [v]
-            elif fv == mine or fv == maxe:
-                if fv == mine:
-                    Ie.append(v)
-                if fv == maxe:
-                    Se.append(v)
+            if fv == mine and v not in Ie:
+                if debug:
+                    print("Updating minimum.")
+                Ie.append(v)
+            if fv == maxe and v not in Se:
+                if debug:
+                    print("Updating maximum.")
+                Se.append(v)
+            if debug:
+                print("Ie", Ie, "Se", Se)
         edge_info[e.uid] = (Ie, Se, maxe - mine)
+    if debug:
+        print("Returning:", edge_info)
     return edge_info
 
 
@@ -156,6 +181,10 @@ def weighted_diffusion_gradient(f, H):
     :param H:
     :return:
     """
+    # We will round the vector f to a small(ish) precision so as to
+    # avoid vertices ending in the wrong equivalence classes due to numerical errors.
+    f = np.round(f, decimals=5)
+
     # Compute some standard information about every edge in the hypergraph
     edge_info = compute_edge_info(f, H)
 
@@ -164,9 +193,7 @@ def weighted_diffusion_gradient(f, H):
 
     # We will refer to the steps of the procedure in Figure 4.1 of the reference paper. Starting with...
     # STEP 1
-    # Find the equivalence classes of the input vector. We will round the vector f to a small(ish) precision so as to
-    # avoid vertices ending in the wrong equivalence classes due to numerical errors.
-    f = np.round(f, decimals=5)
+    # Find the equivalence classes of the input vector.
     equiv_classes = {}
     vname_to_vidx = {}
     for vidx, vname in enumerate(H.nodes):
@@ -214,6 +241,36 @@ def hypergraph_laplacian(phi, H):
     return -hypergraph_degree_mat(H) @ r
 
 
+def hypergraph_lap_conn_graph(phi, H):
+    """
+    Given a current vector in the measure space, return a graph object demonstrating the basic connectivity of the
+    underlying laplacian graph. (For now, I don't actually compute the weights on this graph fully)
+    :param phi: A vector in the measure space
+    :param H: The underlying hypergraph
+    :return: A networkx graph object
+    """
+    f = measure_to_weighted(phi, H)
+
+    # We will round the vector f to a small(ish) precision so as to
+    # avoid vertices ending in the wrong equivalence classes due to numerical errors.
+    f = np.round(f, decimals=5)
+
+    edge_info = compute_edge_info(f, H)
+    G = nx.Graph()
+
+    # Add the vertices
+    for v in H.nodes:
+        G.add_node(v)
+
+    # Add the edges
+    for e, einfo in edge_info.items():
+        for u in einfo[0]:
+            for v in einfo[1]:
+                G.add_edge(u, v)
+
+    return G
+
+
 # =======================================================
 # Simulate the heat diffusion process
 # =======================================================
@@ -230,8 +287,24 @@ def sim_lap_heat_diff(phi, H, T=1, step=0.1):
     for t in np.linspace(0, T, int(T/step)):
         print(x_t)
         grad = -hypergraph_laplacian(x_t, H)
-        if np.sum(grad) < -0.1:
-            break
+        x_t += step * grad
+    return x_t
+
+
+def sim_hyp_pagerank(alpha, s, phi0, H, num_iters=1000, step=0.01):
+    """
+    Compute an approximation of the hypergraph pagerank.
+    :param alpha: As in definition of pagerank. (the teleport probability)
+    :param s: The teleport vector.
+    :param phi0: The starting vector, in the measure space
+    :param H: The underlying hypergraph
+    :return: The pagerank vector
+    """
+    x_t = phi0
+    beta = (2 * alpha) / (1 + alpha)
+    for t in np.linspace(0, int(num_iters * step), num_iters):
+        print(x_t)
+        grad = beta * (s - x_t) - (1 - beta) * hypergraph_laplacian(x_t, H)
         x_t += step * grad
     return x_t
 
@@ -245,5 +318,14 @@ if __name__ == "__main__":
     f = measure_to_weighted(phi, H)
     x = measure_to_normalized(phi, H)
 
-    print(np.sum(sim_lap_heat_diff(phi, H, T=10, step=0.01)))
+    phi_end = sim_hyp_pagerank(0.8, np.array([1, 0, 0, 0, 0, 0]), phi, H)
+    G = hypergraph_lap_conn_graph(phi_end, H)
+
+    # options = {
+    #     'node_color': 'black',
+    #     'node_size': 100,
+    #     'width': 3,
+    # }
+    nx.draw_networkx(G, with_labels=True)
+    plt.show()
 
