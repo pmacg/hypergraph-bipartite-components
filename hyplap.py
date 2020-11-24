@@ -7,6 +7,7 @@ import hypernetx as hnx
 import numpy as np
 import matplotlib.pyplot as plt
 import hypconstruct
+import hypcheeg
 import sys
 from scipy.optimize import linprog
 
@@ -402,6 +403,29 @@ def hypergraph_lap_conn_graph(phi, H):
     return G
 
 
+def hypergraph_clique_graph(H):
+    """
+    Given a hypergraph H, construct the 'clique graph' formed by replacing each hyperedge with a clique.
+    :param H:
+    :return:
+    """
+    edge_info = compute_edge_info(f, H)
+    G = nx.Graph()
+
+    # Add the vertices
+    for v in H.nodes:
+        G.add_node(v)
+
+    # Add the edges
+    for e, einfo in edge_info.items():
+        for u in einfo[3]:
+            for v in einfo[3]:
+                if u != v:
+                    G.add_edge(u, v)
+
+    return G
+
+
 def hyp_plot_conn_graph(phi, H, show_hyperedges=True):
     """
     Plot the pagerank connectivity graph along with the hypergraph.
@@ -410,7 +434,16 @@ def hyp_plot_conn_graph(phi, H, show_hyperedges=True):
     :return:
     """
     G = hypergraph_lap_conn_graph(phi, H)
+    hyp_plot_with_graph(G, H, show_hyperedges=show_hyperedges)
 
+
+def hyp_plot_with_graph(G, H, show_hyperedges=True):
+    """
+    Plot a hypergraph with a simple graph on the same vertex set.
+    :param G: The simple graph
+    :param H: The hypergraph
+    :return:
+    """
     # Get the positioning of the nodes for drawing the hypergrpah
     pos = hnx.drawing.rubber_band.layout_node_link(H, layout=nx.spring_layout)
     ax = plt.gca()
@@ -513,29 +546,85 @@ def check_pagerank(alpha, pr, H):
 if __name__ == "__main__":
     # Construct an example hypergraph
     # H = hnx.Hypergraph({'e1': [1, 2, 3], 'e2': [1, 3, 4, 5, 6], 'e3': [3, 6]})
-    # H = hnx.Hypergraph({'e1': [1, 2, 3], 'e2': [1, 2, 4], 'e3': [3, 4]})
-    n = 20
-    H = hypconstruct.construct_hyp_low_cond(int(n/2), int(n/2), int(n*1.5), 3, 0.1, 0.5)
+    H = hnx.Hypergraph({'e1': [1], 'e2': [1, 2], 'e3': [1, 2, 3], 'e4': [1, 2, 3, 4], 'e5': [1, 2, 3, 4, 5]})
+    # n = 200
+    # r = 10
+    # m = int(n*2)
+    # H = hypconstruct.construct_hyp_low_cond(int(n/2), int(n/2), m, r, 0.1, 0.5)
     # H = hnx.Hypergraph({'e1': [1, 2, 3], 'e2': [4, 5, 6]})
+
+    # Counter-example for the first edge-sampling technique
+    # n = 4
+    # H = hnx.Hypergraph({
+    #     'e1': ['a1', 'a2', 'a3'],
+    #     'e2': ['a1', 'a3', 'a4'],
+    #     'e3': ['a1', 'a4', 'a2'],
+    # })
+    # S = ['a1']
 
     # Get the mapping from node names to indices
     vname_to_vidx = {}
     for vidx, vname in enumerate(H.nodes):
         vname_to_vidx[vname] = vidx
 
-    # Create a starting vector
-    s = np.zeros(n)
-    s[vname_to_vidx['a1']] = 1
-    phi = np.copy(s)
-    f = measure_to_weighted(phi, H)
-    x = measure_to_normalized(phi, H)
+    # Check whether a vector is an eigenvector of the hypergraph laplacian
+    # v = [4, -5, -5, 5, 5]
+    # v = [1, 1, 1, 1, 1]
+    # v = [1, 1, 1, -4, -4]
+    v = [3/2, 3/2, -1, -7/2, -7/2]
+    Lv = - weighted_diffusion_gradient(v, H)
+    possible_eigenvalue = Lv[0] / v[0]
+    eigenvec_check = [possible_eigenvalue * x for x in v]
+    print(f"Lv: {Lv}")
+    print(f"lambda: {possible_eigenvalue}")
+    print(f"lambda v: {eigenvec_check}")
 
-    pr = sim_hyp_pagerank(0.8, s, phi, H, debug=False, max_iters=1000, check_converge=True)
-    weighted_pr = measure_to_weighted(pr, H)
-    for i in range(1, int(n/2) + 1):
-        print(f"pr(a{i}) = {pr[vname_to_vidx['a' + str(i)]]}, prw(a{i}) = {weighted_pr[vname_to_vidx['a' + str(i)]]}")
-    for i in range(1, int(n/2) + 1):
-        print(f"pr(b{i}) = {pr[vname_to_vidx['b' + str(i)]]}, prw(b{i}) = {weighted_pr[vname_to_vidx['b' + str(i)]]}")
-    print("pagerank", pr)
-    check_pagerank(0.8, pr, H)
-    hyp_plot_conn_graph(pr, H, show_hyperedges=False)
+    # Create a starting vector
+    # s = np.zeros(n)
+    # s[vname_to_vidx['a1']] = 1
+    # phi = np.copy(s)
+    # f = measure_to_weighted(phi, H)
+    # x = measure_to_normalized(phi, H)
+
+    # Compute the pagerank
+    # pr = sim_hyp_pagerank(0.8, s, phi, H, debug=False, max_iters=1000, check_converge=True)
+    # weighted_pr = measure_to_weighted(pr, H)
+
+    # Output the pagerank vector
+    # for i in range(1, int(n/2) + 1):
+    #     print(f"pr(a{i}) = {pr[vname_to_vidx['a' + str(i)]]}, prw(a{i}) = {weighted_pr[vname_to_vidx['a' + str(i)]]}")
+    # for i in range(1, int(n/2) + 1):
+    #     print(f"pr(b{i}) = {pr[vname_to_vidx['b' + str(i)]]}, prw(b{i}) = {weighted_pr[vname_to_vidx['b' + str(i)]]}")
+    # print("pagerank", pr)
+
+    # Check that the pagerank vector is correct
+    # check_pagerank(0.8, pr, H)
+
+    # Compute an approximate graph
+    # G = hypcheeg.hyp_min_edges_graph(H)
+    # G = hypcheeg.hyp_degree_graph(H, c=2, debug=True)
+
+    # Get the conductance of the target set
+    # S = ['a' + str(i) for i in range(1, int(n/2) + 1)]
+    # print(f"phi(S) = {hypcheeg.hyp_conductance(H, S)}")
+
+    # Plot the conductance of the set in the constructed graph
+    # print(f"phi_G(S) = {hypcheeg.graph_self_loop_conductance(S, G, H)}")
+    # print(f"phi_G(S) = {nx.algorithms.cuts.conductance(G, S, weight='weight')}")
+
+    # List the spectrum of the constructed graph G
+    # print(f"# Connected Components of G: {nx.number_connected_components(G)}")
+    # print(f"Connected Components of G: {[c for c in nx.connected_components(G)]}")
+    # print(f"Spectrum of G: {nx.laplacian_spectrum(G, weight='weight')}")
+
+    # Get the best sweep set
+    # S_star = hypcheeg.hyp_sweep_set(pr, H, debug=False)
+    # print(f"phi(S*) = {hypcheeg.hyp_conductance(H, S_star)}, S* = {S_star}")
+
+    # Plot the hypergraph
+    # hnx.draw(H)
+    # plt.show()
+    # Plot the hypergraph and the pagerank graph
+    # hyp_plot_with_graph(G, H, show_hyperedges=False)
+    # hyp_plot_conn_graph(pr, H, show_hyperedges=True)
+
