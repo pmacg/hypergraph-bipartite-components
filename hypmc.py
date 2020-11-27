@@ -1,12 +1,15 @@
 """
 This file contains code for computing the hypergraph max-cut laplacian operator.
 """
+import math
 import hyplap
+import hypconstruct
 import hypcheeg
 import numpy as np
 from scipy.optimize import linprog
 import hypernetx as hnx
 import matplotlib.pyplot as plt
+import random
 
 
 def find_densest_subset_mc(U, H, edge_info, debug=False):
@@ -31,12 +34,12 @@ def find_densest_subset_mc(U, H, edge_info, debug=False):
         if len([v for v in U if v in einfo[1]]) > 0:
             if einfo[2] < 0:
                 Sp.append(e)
-            else:
+            elif einfo[2] > 0:
                 Sm.append(e)
         if len([v for v in U if v in einfo[0]]) > 0:
             if einfo[2] < 0:
                 Ip.append(e)
-            else:
+            elif einfo[2] > 0:
                 Im.append(e)
 
     if debug:
@@ -326,35 +329,239 @@ def hypergraph_measure_mc_laplacian(phi, H, debug=False):
 # =======================================================
 # Simulate the max cut heat diffusion process
 # =======================================================
-def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False):
+def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_diffusion_data=False, print_measure=False, normalise=False):
     """
     Simulate the heat diffusion process for the hypergraph max cut operator.
     :param phi: The measure vector at the start of the process
     :param H: The underlying hypergraph
     :param T: The end time of the process
     :param step: The time interval to use for each step
+    :param debug: Whether to print debug logs
+    :param plot_diff: Whether to plot graphs showing the progression of the diffusion
+    :param save_diffusion_data: Whether to save a csv file containing the diffusion data
+    :param print_measure: Whether to print the measure vector at each step
+    :param normalise: Whether to normalise the measure vector at each step
     :return: A measure vector at the end of the process.
     """
+    # If we are going to plot the diffusion process, we will show the following quantities:
+    #  F(t) = \phi_t D^{-1} \phi_t
+    #  - log F(t)
+    #  G(t) = d/dt - log F(t)
+    t_steps = np.linspace(0, T, int(T/step))
+    ft = []
+    mlogft = []
+    gt = []
+
+    # Open the text file to write
+    if save_diffusion_data:
+        fout = open("diffusion_data.csv", 'w')
+        foutw = open("diffusion_data_weighted.csv", 'w')
+    else:
+        fout = None
+        foutw = None
+
     x_t = phi
-    for t in np.linspace(0, T, int(T/step)):
-        print(x_t)
+    for t in t_steps:
+        if print_measure:
+            print(f"Time {t:.2f}; rho_t = {x_t}")
+        if save_diffusion_data:
+            fout.write(f"{','.join([str(x) for x in x_t])}\n")
+            foutw.write(f"{','.join([str(x) for x in hyplap.measure_to_weighted(x_t, H)])}\n")
         grad = -hypergraph_measure_mc_laplacian(x_t, H, debug=debug)
         x_t += step * grad
+
+        if normalise:
+            x_t = x_t / (x_t @ x_t)
+
+        # Add the graph points for this time step
+        if plot_diff:
+            this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_t
+            ft.append(this_ft)
+            mlogft.append(- math.log(this_ft))
+            x_tn = x_t / this_ft
+            gt.append((x_tn @ hypergraph_measure_mc_laplacian(x_tn, H)) / (x_tn @ hyplap.hypergraph_degree_mat(H) @ x_tn))
+
+    if save_diffusion_data:
+        fout.close()
+        foutw.close()
+
+    # Print the final value of G(t). If the process is fully converged, then this is an eigenvalue of the hypergraph
+    # laplacian operator.
+    this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_t
+    x_tn = x_t / this_ft
+    final_gt = (x_tn @ hypergraph_measure_mc_laplacian(x_tn, H)) / (x_tn @ hyplap.hypergraph_degree_mat(H) @ x_tn)
+    print(f"Final value of G(t): {final_gt:.5f}")
+
+    # Now, plot the graphs
+    if plot_diff:
+        # Create the axes
+        fig, ax1 = plt.subplots()
+        if not normalise:
+            ax2 = ax1.twinx()
+
+        # Label the axes
+        ax1.set_xlabel("t")
+        ax1.set_ylabel("F(t) or G(t)")
+        if not normalise:
+            ax2.set_ylabel("- log F(t)")
+
+        # Plot the functions
+        if not normalise:
+            line1 = ax1.plot(t_steps, ft)
+            line2 = ax2.plot(t_steps, mlogft, color='tab:green')
+        line3 = ax1.plot(t_steps, gt)
+
+        # Add legend and show plot
+        if not normalise:
+            ax2.legend(line1 + line2 + line3, ("F(t) = \\rho_t^T D^{-1} \\rho_t", "- log F(t)", "G(t) = d/dt - log F(t)"))
+        fig.tight_layout()
+        plt.show()
+
     return x_t
 
 
 def main():
-    # Construct a hypergraph
-    H = hnx.Hypergraph({'e1': [1, 2, 3]})
+    # Choose which example set-up to demonstrate
+    #  1: Single 3-edge
+    #  20s: 3-uniform not 2-colorable
+    #  30s: 2-graph versions of the 20s
+    #  40s: Example of hypergraph with two eigenvectors
+    example = 40
+    show_hypergraph = False
 
-    # Draw the hypergraph
-    # hnx.draw(H)
-    # plt.show()
+    if example == 1:
+        # Construct a hypergraph
+        H = hnx.Hypergraph({'e1': [1, 2, 3]})
 
-    # Simulate the max cut diffusion process
-    s = [1, 0, 0]
-    h = sim_mc_heat_diff(s, H, 1, debug=False)
-    print(h)
+        # Draw the hypergraph
+        if show_hypergraph:
+            hyp_fig = plt.figure(1)
+            hnx.draw(H)
+            hyp_fig.show()
+
+        # Simulate the heat diffusion
+        s = [1, 0, 0]
+        h = sim_mc_heat_diff(s, H, 5, debug=False, plot_diff=True)
+
+    if 20 <= example < 30:
+        H = hnx.Hypergraph(
+            {
+                'e1': [1, 2, 3],
+                'e2': [1, 2, 4],
+                'e3': [1, 2, 5],
+                'e4': [3, 4, 5],
+                'e5': [2, 6, 7],
+                'e6': [2, 6, 8],
+                'e7': [2, 6, 9],
+                'e8': [7, 8, 9],
+                'e9': [6, 1, 10],
+                'e10': [6, 1, 11],
+                'e11': [6, 1, 12],
+                'e12': [10, 11, 12]
+            })
+
+        # Draw the hypergraph
+        if show_hypergraph:
+            hyp_fig = plt.figure(1)
+            hnx.draw(H)
+            hyp_fig.show()
+
+        # Simulate the max cut diffusion process
+        s = np.zeros(12)
+        if example == 21:
+            s[0] = 1
+        if example == 22:
+            s[2] = 1
+        if example == 23:
+            s = [0.1 * x for x in [-1.4, -1.4, 0.22, 0.19, 0.19, 1.6, 0, 0, 0, 0, 0, 0]]
+        h = sim_mc_heat_diff(s, H, 10, step=0.01, debug=False, plot_diff=True, save_diffusion_data=True)
+
+    if example == 31:
+        H = hnx.Hypergraph(
+            {
+                'e1': [1, 2],
+                'e2': [1, 2],
+                'e3': [1, 2],
+                'e41': [3, 4],
+                'e42': [4, 5],
+                'e43': [5, 3],
+                'e51': [2, 7],
+                'e52': [6, 7],
+                'e61': [2, 8],
+                'e62': [6, 8],
+                'e71': [2, 9],
+                'e72': [6, 9],
+                'e81': [7, 8],
+                'e82': [8, 9],
+                'e83': [9, 7],
+                'e9': [6, 1],
+                'e121': [10, 11],
+                'e122': [11, 12],
+                'e123': [12, 10],
+            })
+
+        # Draw the hypergraph
+        if show_hypergraph:
+            hyp_fig = plt.figure(1)
+            hnx.draw(H)
+            hyp_fig.show()
+
+        # Simulate the max cut diffusion process
+        s = np.zeros(12)
+        if example == 31:
+            s[0] = 1
+        h = sim_mc_heat_diff(s, H, 20, step=0.1, debug=False, plot_diff=True, save_diffusion_data=True)
+
+    if example == 40:
+        # Construct a random 3-uniform hypergraph
+        n = 10
+        m = 20
+        # H = hypconstruct.random_hypergraph(n, m, 3)
+        # 'Random hypergraph'
+        # vertex order: 6, 4, 8, 1, 5, 3, 7, 10, 2, 9
+        H = hnx.Hypergraph({'e1': ['a6', 'a4', 'a8'],
+                            'e2': ['a1', 'a5', 'a3'],
+                            'e3': ['a6', 'a7', 'a10'],
+                            'e4': ['a2', 'a4', 'a1'],
+                            'e5': ['a9', 'a4', 'a6'],
+                            'e6': ['a2', 'a4', 'a6'],
+                            'e7': ['a10', 'a7', 'a3'],
+                            'e8': ['a2', 'a1', 'a8'],
+                            'e9': ['a1', 'a7', 'a2'],
+                            'e10': ['a3', 'a6', 'a9'],
+                            'e11': ['a7', 'a2', 'a6'],
+                            'e12': ['a1', 'a9', 'a5'],
+                            'e13': ['a8', 'a10', 'a9'],
+                            'e14': ['a3', 'a9', 'a4'],
+                            'e15': ['a8', 'a7', 'a4'],
+                            'e16': ['a5', 'a10', 'a8'],
+                            'e17': ['a4', 'a2', 'a3'],
+                            'e18': ['a9', 'a5', 'a7'],
+                            'e19': ['a2', 'a5', 'a6'],
+                            'e20': ['a4', 'a9', 'a7']})
+
+        # Plot the hypergraph
+        if show_hypergraph:
+            hyp_fig = plt.figure(1)
+            hnx.draw(H)
+            hyp_fig.show()
+            plt.show()
+
+        # First eigenvector - converged to from starting vertex index 4
+        # s = hyplap.weighted_to_measure([0.185571, 0.316896, -0.358508, -0.348528, 0.2466, -0.348606, -0.348613, 0.394087, 0.185571, -0.348613], H)
+        s = np.zeros(n)
+        s[8] = 1
+
+        # Second eigenvector - converged to from starting vertex index 8
+        # s = hyplap.weighted_to_measure([-0.371296, 0.351462, -0.244721, -0.244721, -0.244721, -0.244721, -0.371296, 0.344727, 0.351462, 0.344727], H)
+
+        # Run the heat diffusion process
+        _ = sim_mc_heat_diff(s, H, 200,
+                             step=0.01,
+                             print_measure=True,
+                             plot_diff=True,
+                             save_diffusion_data=True,
+                             normalise=True)
 
 
 if __name__ == "__main__":

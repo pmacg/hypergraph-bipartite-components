@@ -3,6 +3,7 @@ Construct some hypergraphs with certain properties.
 """
 import hypernetx as hnx
 import random
+import math
 
 
 def construct_hyp_low_cond(n1, n2, m, r, p1, p2):
@@ -39,6 +40,16 @@ def construct_hyp_low_cond(n1, n2, m, r, p1, p2):
                 hyp_dict[e] = random.sample(nodesB, r)
 
     # Return the final hypergraph
+    print(f"Constructed hypergraph: {hyp_dict}")
     return hnx.Hypergraph(hyp_dict)
 
 
+def random_hypergraph(n, m, r):
+    """
+    Construct a completely random hypergraph.
+    :param n: The number of nodes
+    :param m: The number of edges
+    :param r: The rank of each edge
+    :return:
+    """
+    return construct_hyp_low_cond(n, 0, m, r, 0, 1)
