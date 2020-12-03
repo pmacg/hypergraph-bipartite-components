@@ -329,7 +329,7 @@ def hypergraph_measure_mc_laplacian(phi, H, debug=False):
 # =======================================================
 # Simulate the max cut heat diffusion process
 # =======================================================
-def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_diffusion_data=False, print_measure=False, normalise=False, print_time=False):
+def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_diffusion_data=False, print_measure=False, normalise=False, print_time=False, check_converged=True):
     """
     Simulate the heat diffusion process for the hypergraph max cut operator.
     :param phi: The measure vector at the start of the process
@@ -342,7 +342,8 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     :param print_measure: Whether to print the measure vector at each step
     :param normalise: Whether to normalise the measure vector at each step
     :param print_time: Whether to print the time steps
-    :return: A measure vector at the end of the process, and the final value of G(T)
+    :param check_converged: Whether to check for convergence of G(t)
+    :return: A measure vector at the end of the process, the final time of the diffusion process, the full sequence of G(T)
     """
     # If we are going to plot the diffusion process, we will show the following quantities:
     #  F(t) = \phi_t D^{-1} \phi_t
@@ -362,7 +363,9 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
         foutw = None
 
     x_t = phi
+    final_t = 0
     for t in t_steps:
+        final_t = t
         if print_measure:
             print(f"Time {t:.2f}; rho_t = {x_t}")
         elif print_time:
@@ -377,12 +380,22 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
             x_t = x_t / (x_t @ x_t)
 
         # Add the graph points for this time step
-        if plot_diff:
-            this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_t
-            ft.append(this_ft)
-            mlogft.append(- math.log(this_ft))
-            x_tn = x_t / this_ft
-            gt.append((x_tn @ hypergraph_measure_mc_laplacian(x_tn, H)) / (x_tn @ hyplap.hypergraph_degree_mat(H) @ x_tn))
+        this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_t
+        ft.append(this_ft)
+        mlogft.append(- math.log(this_ft))
+        x_tn = x_t / this_ft
+        this_gt = (x_tn @ hypergraph_measure_mc_laplacian(x_tn, H)) / (x_tn @ hyplap.hypergraph_degree_mat(H) @ x_tn)
+        gt.append(this_gt)
+
+        # Check for convergence
+        if check_converged:
+            gt_len = len(gt)
+            if gt_len >= 30:
+                prev_gt = gt[int(gt_len / 3)]
+                diff = prev_gt - this_gt
+                if diff < 0.0000001:
+                    # We have converged
+                    break
 
     if save_diffusion_data:
         fout.close()
@@ -421,29 +434,35 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
         fig.tight_layout()
         plt.show()
 
-    return x_t, final_gt
+    return x_t, final_t, gt
 
 
-def check_random_2_color_graph(n, T):
+def check_random_2_color_graph(n, m, r, t, eps):
     """
-    Check the final eigenvalue of a random 2-colorable graph
+    Check the final eigenvalue of a random 2-colorable graph. Returns the following tuple:
+        T, G(T), G(T/2), G(9T/10)
     :param n: Half the number of vertices in the graph
-    :param T: The end time of the diffusion process
-    :return: 
+    :param m: The number of edges in the hypergraph
+    :param r: Half the rank of each edge
+    :param t: The maximum end time of the diffusion process
+    :param eps: The update step size during the diffusion process
+    :return: Tuple described above
     """
-    H = hypconstruct.construct_hyp_2_colorable(n, n, 3 * n, 2)
+    H = hypconstruct.construct_hyp_2_colorable(n, n, m, r)
 
     # Create the starting vector
     s = np.zeros(2 * n)
     s[1] = 1
 
     # Run the heat diffusion process
-    _, g_t = sim_mc_heat_diff(s, H, T,
-                         step=0.1,
-                         normalise=True)
+    _, final_t, g_sequence = sim_mc_heat_diff(s, H, t,
+                                              step=eps,
+                                              normalise=True,
+                                              check_converged=True)
 
-    # Print the result
-    print(f"Resulting G(t): {g_t}")
+    # Return the result
+    g_length = len(g_sequence)
+    return final_t, g_sequence[-1], g_sequence[int(g_length/2)], g_sequence[int(9 * g_length / 10)]
 
 
 def main():
@@ -622,11 +641,36 @@ def main():
                              normalise=True)
 
     if example == 60:
+        # Run some experiments
+        # Which values of n to test
+        values_of_n = [5, 10] #, 50, 100, 500, 1000]
+
+        # Which values of r to test
+        values_of_r = [2]
+
+        # Which values of epsilon to test
+        values_of_epsilon = [0.1]
+
+        # How many of each combination to test
         num_to_check = 10
-        for i in range(num_to_check):
-            print(f"Checking random graph: {i}")
-            check_random_2_color_graph(n, 20)
-            print()
+
+        # Iterate through all of the test cases
+        with open("testresults.csv", 'w') as fout:
+            # Save the header line
+            to_print = "n, m, r, T, eps, G(T), G(T/2), G(9T/10)\n"
+            # print(to_print)
+            fout.write(to_print)
+            fout.flush()
+            for n in values_of_n:
+                for r in values_of_r:
+                    for eps in values_of_epsilon:
+                        for i in range(1, num_to_check + 1):
+                            T, G_T, G_T_2, G_9T_10 = check_random_2_color_graph(n, 6 * n, r, 4 * n, eps)
+                            to_print = f"{n}, {6 * n}, {r}, {T}, {eps}, {G_T}, {G_T_2}, {G_9T_10}\n"
+                            # print(to_print)
+                            fout.write(to_print)
+                            fout.flush()
+
 
 if __name__ == "__main__":
     main()

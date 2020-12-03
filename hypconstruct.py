@@ -93,8 +93,8 @@ def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
             hyp_dict[e] = side_a_nodes + side_b_nodes
 
         h = hnx.Hypergraph(hyp_dict)
-        connected = h.is_connected()
+        connected = h.is_connected() and len(h.nodes) == (n1 + n2)
 
     # Return the final hypergraph
-    print(f"Constructed hypergraph: {hyp_dict}")
+    #print(f"Constructed hypergraph: {hyp_dict}")
     return h
