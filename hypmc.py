@@ -329,7 +329,7 @@ def hypergraph_measure_mc_laplacian(phi, H, debug=False):
 # =======================================================
 # Simulate the max cut heat diffusion process
 # =======================================================
-def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_diffusion_data=False, print_measure=False, normalise=False):
+def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_diffusion_data=False, print_measure=False, normalise=False, print_time=False):
     """
     Simulate the heat diffusion process for the hypergraph max cut operator.
     :param phi: The measure vector at the start of the process
@@ -341,7 +341,8 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     :param save_diffusion_data: Whether to save a csv file containing the diffusion data
     :param print_measure: Whether to print the measure vector at each step
     :param normalise: Whether to normalise the measure vector at each step
-    :return: A measure vector at the end of the process.
+    :param print_time: Whether to print the time steps
+    :return: A measure vector at the end of the process, and the final value of G(T)
     """
     # If we are going to plot the diffusion process, we will show the following quantities:
     #  F(t) = \phi_t D^{-1} \phi_t
@@ -364,6 +365,8 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     for t in t_steps:
         if print_measure:
             print(f"Time {t:.2f}; rho_t = {x_t}")
+        elif print_time:
+            print(f"Time {t:.2f}")
         if save_diffusion_data:
             fout.write(f"{','.join([str(x) for x in x_t])}\n")
             foutw.write(f"{','.join([str(x) for x in hyplap.measure_to_weighted(x_t, H)])}\n")
@@ -390,7 +393,8 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_t
     x_tn = x_t / this_ft
     final_gt = (x_tn @ hypergraph_measure_mc_laplacian(x_tn, H)) / (x_tn @ hyplap.hypergraph_degree_mat(H) @ x_tn)
-    print(f"Final value of G(t): {final_gt:.5f}")
+    if print_time or print_measure:
+        print(f"Final value of G(t): {final_gt:.5f}")
 
     # Now, plot the graphs
     if plot_diff:
@@ -417,7 +421,29 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
         fig.tight_layout()
         plt.show()
 
-    return x_t
+    return x_t, final_gt
+
+
+def check_random_2_color_graph(n, T):
+    """
+    Check the final eigenvalue of a random 2-colorable graph
+    :param n: Half the number of vertices in the graph
+    :param T: The end time of the diffusion process
+    :return: 
+    """
+    H = hypconstruct.construct_hyp_2_colorable(n, n, 3 * n, 2)
+
+    # Create the starting vector
+    s = np.zeros(2 * n)
+    s[1] = 1
+
+    # Run the heat diffusion process
+    _, g_t = sim_mc_heat_diff(s, H, T,
+                         step=0.1,
+                         normalise=True)
+
+    # Print the result
+    print(f"Resulting G(t): {g_t}")
 
 
 def main():
@@ -426,8 +452,12 @@ def main():
     #  20s: 3-uniform not 2-colorable
     #  30s: 2-graph versions of the 20s
     #  40s: Example of hypergraph with two eigenvectors
-    example = 40
+    #  50s: Look at random 2-colorable graphs
+    #  60s: Search (!) for 2-colorable graphs with bad algorithm results
+    example = 60
+    n = 10
     show_hypergraph = False
+    show_diffusion = False
 
     if example == 1:
         # Construct a hypergraph
@@ -549,20 +579,54 @@ def main():
 
         # First eigenvector - converged to from starting vertex index 4
         # s = hyplap.weighted_to_measure([0.185571, 0.316896, -0.358508, -0.348528, 0.2466, -0.348606, -0.348613, 0.394087, 0.185571, -0.348613], H)
-        s = np.zeros(n)
-        s[8] = 1
+        # s = np.zeros(n)
+        # s[8] = 1
 
         # Second eigenvector - converged to from starting vertex index 8
         # s = hyplap.weighted_to_measure([-0.371296, 0.351462, -0.244721, -0.244721, -0.244721, -0.244721, -0.371296, 0.344727, 0.351462, 0.344727], H)
 
+        # Start from the all-ones vector
+        s = 0.2 * hyplap.weighted_to_measure(np.ones(n), H)
+
         # Run the heat diffusion process
-        _ = sim_mc_heat_diff(s, H, 200,
+        _ = sim_mc_heat_diff(s, H, 20,
                              step=0.01,
                              print_measure=True,
                              plot_diff=True,
                              save_diffusion_data=True,
+                             normalise=False)
+
+    if example == 50:
+        H = hypconstruct.construct_hyp_2_colorable(n, n, 3*n, 2)
+
+        # Plot the hypergraph
+        # Plot the hypergraph
+        if show_hypergraph:
+            hyp_fig = plt.figure(1)
+            hnx.draw(H)
+            hyp_fig.show()
+            if not show_diffusion:
+                plt.show()
+
+        # Create the starting vector
+        s = np.zeros(2*n)
+        s[1] = 1
+
+        # Run the heat diffusion process
+        _ = sim_mc_heat_diff(s, H, 20,
+                             step=0.1,
+                             print_measure=False,
+                             print_time=True,
+                             plot_diff=show_diffusion,
+                             save_diffusion_data=False,
                              normalise=True)
 
+    if example == 60:
+        num_to_check = 10
+        for i in range(num_to_check):
+            print(f"Checking random graph: {i}")
+            check_random_2_color_graph(n, 20)
+            print()
 
 if __name__ == "__main__":
     main()

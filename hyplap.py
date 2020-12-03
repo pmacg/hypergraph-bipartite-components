@@ -40,7 +40,7 @@ def measure_to_weighted(phi, H):
     :param H: The underlying hypergraph.
     :return: The vector f in the weighted space.
     """
-    return np.linalg.inv(hypergraph_degree_mat(H)) @ phi
+    return np.linalg.pinv(hypergraph_degree_mat(H)) @ phi
 
 
 def weighted_to_normalized(f, H):
