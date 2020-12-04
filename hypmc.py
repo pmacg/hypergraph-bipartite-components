@@ -643,7 +643,7 @@ def main():
     if example == 60:
         # Run some experiments
         # Which values of n to test
-        values_of_n = [5, 10] #, 50, 100, 500, 1000]
+        values_of_n = [5, 10, 50, 100, 500, 1000]
 
         # Which values of r to test
         values_of_r = [2]
@@ -652,7 +652,7 @@ def main():
         values_of_epsilon = [0.1]
 
         # How many of each combination to test
-        num_to_check = 10
+        num_to_check = 20
 
         # Iterate through all of the test cases
         with open("testresults.csv", 'w') as fout:
