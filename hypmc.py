@@ -658,17 +658,17 @@ def main():
         # Iterate through all of the test cases
         with open("testresults.csv", 'w') as fout:
             # Save the header line
-            to_print = "n, m, r, T, eps, G(T), G(T/2), G(9T/10)\n"
-            # print(to_print)
+            to_print = "test, n, m, r, T, eps, G(T), G(T/2), G(9T/10)\n"
             fout.write(to_print)
             fout.flush()
+            testcase = 0
             for n in values_of_n:
                 for r in values_of_r:
                     for eps in values_of_epsilon:
                         for i in range(1, num_to_check + 1):
+                            testcase += 1
                             T, G_T, G_T_2, G_9T_10 = check_random_2_color_graph(n, 6 * n, r, 4 * n, eps)
-                            to_print = f"{n}, {6 * n}, {r}, {T}, {eps}, {G_T}, {G_T_2}, {G_9T_10}\n"
-                            # print(to_print)
+                            to_print = f"{testcase}, {n}, {6 * n}, {r}, {T}, {eps}, {G_T}, {G_T_2}, {G_9T_10}\n"
                             fout.write(to_print)
                             fout.flush()
 
