@@ -329,7 +329,7 @@ def hypergraph_measure_mc_laplacian(phi, H, debug=False):
 # =======================================================
 # Simulate the max cut heat diffusion process
 # =======================================================
-def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_diffusion_data=False, print_measure=False, normalise=False, print_time=False, check_converged=True):
+def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_diffusion_data=False, print_measure=False, normalise=False, print_time=False, check_converged=False):
     """
     Simulate the heat diffusion process for the hypergraph max cut operator.
     :param phi: The measure vector at the start of the process
@@ -384,7 +384,8 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
         ft.append(this_ft)
         mlogft.append(- math.log(this_ft))
         x_tn = x_t / this_ft
-        this_gt = (x_tn @ hypergraph_measure_mc_laplacian(x_tn, H)) / (x_tn @ hyplap.hypergraph_degree_mat(H) @ x_tn)
+        this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ hypergraph_measure_mc_laplacian(x_tn, H)) / (
+                   x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_tn)
         gt.append(this_gt)
 
         # Check for convergence
@@ -405,7 +406,8 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     # laplacian operator.
     this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_t
     x_tn = x_t / this_ft
-    final_gt = (x_tn @ hypergraph_measure_mc_laplacian(x_tn, H)) / (x_tn @ hyplap.hypergraph_degree_mat(H) @ x_tn)
+    final_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ hypergraph_measure_mc_laplacian(x_tn, H)) / (
+                x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_tn)
     if print_time or print_measure:
         print(f"Final value of G(t): {final_gt:.5f}")
 
@@ -424,9 +426,9 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
 
         # Plot the functions
         if not normalise:
-            line1 = ax1.plot(t_steps, ft)
-            line2 = ax2.plot(t_steps, mlogft, color='tab:green')
-        line3 = ax1.plot(t_steps, gt)
+            line1 = ax1.plot(t_steps[:len(ft)], ft)
+            line2 = ax2.plot(t_steps[:len(mlogft)], mlogft, color='tab:green')
+        line3 = ax1.plot(t_steps[:len(gt)], gt)
 
         # Add legend and show plot
         if not normalise:
@@ -474,13 +476,13 @@ def main():
     #  50s: Look at random 2-colorable graphs
     #  60s: Search (!) for 2-colorable graphs with bad algorithm results
     example = 60
-    n = 10
+    n = 5
     show_hypergraph = False
     show_diffusion = False
 
     if example == 1:
         # Construct a hypergraph
-        H = hnx.Hypergraph({'e1': [1, 2, 3]})
+        H = hnx.Hypergraph({'e1': [1, 2, 3], 'e2': [2, 3]})
 
         # Draw the hypergraph
         if show_hypergraph:
@@ -490,7 +492,7 @@ def main():
 
         # Simulate the heat diffusion
         s = [1, 0, 0]
-        h = sim_mc_heat_diff(s, H, 5, debug=False, plot_diff=True)
+        _ = sim_mc_heat_diff(s, H, 20, step=0.01, debug=False, plot_diff=True, check_converged=True, print_measure=True, normalise=True)
 
     if 20 <= example < 30:
         H = hnx.Hypergraph(
@@ -525,7 +527,7 @@ def main():
             s = [0.1 * x for x in [-1.4, -1.4, 0.22, 0.19, 0.19, 1.6, 0, 0, 0, 0, 0, 0]]
         h = sim_mc_heat_diff(s, H, 10, step=0.01, debug=False, plot_diff=True, save_diffusion_data=True)
 
-    if example == 31:
+    if example == 30:
         H = hnx.Hypergraph(
             {
                 'e1': [1, 2],
@@ -619,7 +621,6 @@ def main():
         H = hypconstruct.construct_hyp_2_colorable(n, n, 3*n, 2)
 
         # Plot the hypergraph
-        # Plot the hypergraph
         if show_hypergraph:
             hyp_fig = plt.figure(1)
             hnx.draw(H)
@@ -632,12 +633,12 @@ def main():
         s[1] = 1
 
         # Run the heat diffusion process
-        _ = sim_mc_heat_diff(s, H, 20,
-                             step=0.1,
-                             print_measure=False,
+        _ = sim_mc_heat_diff(s, H, 100,
+                             step=0.01,
+                             print_measure=True,
                              print_time=True,
                              plot_diff=show_diffusion,
-                             save_diffusion_data=False,
+                             save_diffusion_data=True,
                              normalise=True)
 
     if example == 60:
