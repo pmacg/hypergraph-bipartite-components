@@ -475,10 +475,10 @@ def main():
     #  40s: Example of hypergraph with two eigenvectors
     #  50s: Look at random 2-colorable graphs
     #  60s: Search (!) for 2-colorable graphs with bad algorithm results
-    example = 60
+    example = 31
     n = 5
-    show_hypergraph = False
-    show_diffusion = False
+    show_hypergraph = True
+    show_diffusion = True
 
     if example == 1:
         # Construct a hypergraph
@@ -527,29 +527,32 @@ def main():
             s = [0.1 * x for x in [-1.4, -1.4, 0.22, 0.19, 0.19, 1.6, 0, 0, 0, 0, 0, 0]]
         h = sim_mc_heat_diff(s, H, 10, step=0.01, debug=False, plot_diff=True, save_diffusion_data=True)
 
-    if example == 30:
-        H = hnx.Hypergraph(
-            {
-                'e1': [1, 2],
-                'e2': [1, 2],
-                'e3': [1, 2],
-                'e41': [3, 4],
-                'e42': [4, 5],
-                'e43': [5, 3],
-                'e51': [2, 7],
-                'e52': [6, 7],
-                'e61': [2, 8],
-                'e62': [6, 8],
-                'e71': [2, 9],
-                'e72': [6, 9],
-                'e81': [7, 8],
-                'e82': [8, 9],
-                'e83': [9, 7],
-                'e9': [6, 1],
-                'e121': [10, 11],
-                'e122': [11, 12],
-                'e123': [12, 10],
-            })
+    if 30 <= example < 40:
+        if example == 30:
+            H = hnx.Hypergraph(
+                {
+                    'e1': [1, 2],
+                    'e2': [1, 2],
+                    'e3': [1, 2],
+                    'e41': [3, 4],
+                    'e42': [4, 5],
+                    'e43': [5, 3],
+                    'e51': [2, 7],
+                    'e52': [6, 7],
+                    'e61': [2, 8],
+                    'e62': [6, 8],
+                    'e71': [2, 9],
+                    'e72': [6, 9],
+                    'e81': [7, 8],
+                    'e82': [8, 9],
+                    'e83': [9, 7],
+                    'e9': [6, 1],
+                    'e121': [10, 11],
+                    'e122': [11, 12],
+                    'e123': [12, 10],
+                })
+        elif example == 31:
+            H = hypconstruct.construct_hyp_2_colorable(n, n, 6 * n, 1)
 
         # Draw the hypergraph
         if show_hypergraph:
@@ -558,10 +561,12 @@ def main():
             hyp_fig.show()
 
         # Simulate the max cut diffusion process
-        s = np.zeros(12)
-        if example == 31:
-            s[0] = 1
-        h = sim_mc_heat_diff(s, H, 20, step=0.1, debug=False, plot_diff=True, save_diffusion_data=True)
+        if example == 30:
+            s = np.zeros(12)
+        elif example == 31:
+            s = np.zeros(2 * n)
+        s[0] = 1
+        h = sim_mc_heat_diff(s, H, 100, step=0.1, debug=False, plot_diff=True, save_diffusion_data=True, print_measure=True, check_converged=True)
 
     if example == 40:
         # Construct a random 3-uniform hypergraph
