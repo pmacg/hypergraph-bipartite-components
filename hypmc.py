@@ -349,10 +349,12 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     #  F(t) = \phi_t D^{-1} \phi_t
     #  - log F(t)
     #  G(t) = d/dt - log F(t)
+    #  h(t) = - d/dt G(t)
     t_steps = np.linspace(0, T, int(T/step))
     ft = []
     mlogft = []
     gt = []
+    ht = []
 
     # Open the text file to write
     if save_diffusion_data:
@@ -387,6 +389,11 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
         this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ hypergraph_measure_mc_laplacian(x_tn, H)) / (
                    x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_tn)
         gt.append(this_gt)
+        if len(gt) > 2:
+            ht.append((gt[-2] - gt[-1])/step)
+        elif len(gt) == 2:
+            ht.append((gt[-2] - gt[-1])/step)
+            ht.append((gt[-2] - gt[-1])/step)
 
         # Check for convergence
         if check_converged:
@@ -427,12 +434,15 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
         # Plot the functions
         if not normalise:
             line1 = ax1.plot(t_steps[:len(ft)], ft)
-            line2 = ax2.plot(t_steps[:len(mlogft)], mlogft, color='tab:green')
+            # line2 = ax2.plot(t_steps[:len(mlogft)], mlogft, color='tab:green')
+            line4 = ax1.plot(t_steps[:len(ht)], ht)
         line3 = ax1.plot(t_steps[:len(gt)], gt)
 
         # Add legend and show plot
         if not normalise:
-            ax2.legend(line1 + line2 + line3, ("F(t) = \\rho_t^T D^{-1} \\rho_t", "- log F(t)", "G(t) = d/dt - log F(t)"))
+            # ax2.legend(line1 + line2 + line3 + line4, ("F(t) = \\rho_t^T D^{-1} \\rho_t", "- log F(t)", "G(t) = d/dt - log F(t)", "h(t) = -d/dt G(t)"))
+            ax2.legend(line1 + line3 + line4,
+                       ("F(t) = \\rho_t^T D^{-1} \\rho_t", "G(t) = d/dt - log F(t)", "h(t) = -d/dt G(t)"))
         fig.tight_layout()
         plt.show()
 
@@ -475,9 +485,9 @@ def main():
     #  40s: Example of hypergraph with two eigenvectors
     #  50s: Look at random 2-colorable graphs
     #  60s: Search (!) for 2-colorable graphs with bad algorithm results
-    example = 31
-    n = 5
-    show_hypergraph = True
+    example = 50
+    n = 100
+    show_hypergraph = False
     show_diffusion = True
 
     if example == 1:
@@ -638,13 +648,13 @@ def main():
         s[1] = 1
 
         # Run the heat diffusion process
-        _ = sim_mc_heat_diff(s, H, 100,
-                             step=0.01,
-                             print_measure=True,
+        _ = sim_mc_heat_diff(s, H, 20,
+                             step=0.1,
+                             print_measure=False,
                              print_time=True,
                              plot_diff=show_diffusion,
-                             save_diffusion_data=True,
-                             normalise=True)
+                             save_diffusion_data=False,
+                             normalise=False)
 
     if example == 60:
         # Run some experiments
