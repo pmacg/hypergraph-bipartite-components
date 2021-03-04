@@ -2,6 +2,7 @@
 Construct some hypergraphs with certain properties.
 """
 import hypernetx as hnx
+import networkx as nx
 import random
 import math
 
@@ -98,3 +99,29 @@ def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
     # Return the final hypergraph
     #print(f"Constructed hypergraph: {hyp_dict}")
     return h
+
+
+def get_clique_graph(H):
+    """
+    Given a hypergraph, H, return the networkx graph corresponding to the clique graph of H.
+    The clique graph is constructed by replacing each hyperedge e with a clique with edges of weight 1/(r(e) - 1).
+    :param H:
+    :return: A networkx graph G
+    """
+    G = nx.Graph()
+
+    # Add the vertices to the graph
+    for vertex in H.nodes:
+        G.add_node(vertex)
+
+    # Add the edges to the graph
+    for edge in H.edges():
+        vertices = [vertex for vertex in edge]
+        rank = len(vertices)
+        new_edges = []
+        for v1_idx in range(rank):
+            for v2_idx in range(v1_idx + 1, rank):
+                new_edges.append((vertices[v1_idx], vertices[v2_idx], {'weight': 1 / (rank - 1)}))
+        G.add_edges_from(new_edges)
+
+    return G
