@@ -7,7 +7,10 @@ import hypconstruct
 import hypcheeg
 import numpy as np
 from scipy.optimize import linprog
+import scipy as sp
+import scipy.sparse
 import hypernetx as hnx
+import networkx as nx
 import matplotlib.pyplot as plt
 import random
 
@@ -326,10 +329,26 @@ def hypergraph_measure_mc_laplacian(phi, H, debug=False):
     return -hyplap.hypergraph_degree_mat(H) @ r
 
 
+def graph_diffusion_operator(G):
+    """
+    Construct the operator (I + A D^{-1}) for the given graph.
+    :param G: A networkx graph
+    :return: a scipy matrix
+    """
+    A = nx.to_scipy_sparse_matrix(G, format="csr")
+    n, m = A.shape
+    degrees = A.sum(axis=1)
+    D = sp.sparse.spdiags(degrees.flatten(), [0], m, n, format="csr")
+    D_inv = sp.sparse.linalg.inv(D)
+    L = sp.sparse.identity(n) + A @ D_inv
+    return L
+
+
 # =======================================================
 # Simulate the max cut heat diffusion process
 # =======================================================
-def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_diffusion_data=False, print_measure=False, normalise=False, print_time=False, check_converged=False):
+def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_diffusion_data=False,
+                     print_measure=False, normalise=False, print_time=False, check_converged=False, start_epsilon=0):
     """
     Simulate the heat diffusion process for the hypergraph max cut operator.
     :param phi: The measure vector at the start of the process
@@ -343,6 +362,8 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     :param normalise: Whether to normalise the measure vector at each step
     :param print_time: Whether to print the time steps
     :param check_converged: Whether to check for convergence of G(t)
+    :param start_epsilon: At each iteration, we will add a small epsilon of the clique graph. This is the starting value
+                          of epsilon. If it is equal to 0, then we will use the basic diffusion process.
     :return: A measure vector at the end of the process, the final time of the diffusion process, the full sequence of G(T)
     """
     # If we are going to plot the diffusion process, we will show the following quantities:
@@ -355,6 +376,11 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     mlogft = []
     gt = []
     ht = []
+
+    # Construct the clique graph and its laplacian operator
+    n = H.number_of_nodes()
+    G = hypconstruct.get_clique_graph(H)
+    L_clique = graph_diffusion_operator(G)
 
     # Open the text file to write
     if save_diffusion_data:
@@ -649,12 +675,13 @@ def main():
 
         # Run the heat diffusion process
         _ = sim_mc_heat_diff(s, H, 20,
-                             step=0.1,
+                             step=1,
                              print_measure=False,
                              print_time=True,
                              plot_diff=show_diffusion,
                              save_diffusion_data=False,
-                             normalise=False)
+                             normalise=False,
+                             start_epsilon=0)
 
     if example == 60:
         # Run some experiments
