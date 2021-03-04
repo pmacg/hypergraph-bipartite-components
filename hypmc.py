@@ -394,15 +394,20 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     final_t = 0
     for t in t_steps:
         final_t = t
+        eps_t = start_epsilon / (t + 1)
         if print_measure:
-            print(f"Time {t:.2f}; rho_t = {x_t}")
+            print(f"Time {t:.2f}; eps_t = {eps_t:.2f}; rho_t = {x_t}")
         elif print_time:
-            print(f"Time {t:.2f}")
+            print(f"Time {t:.2f}; eps_t = {eps_t:.2f}")
         if save_diffusion_data:
             fout.write(f"{','.join([str(x) for x in x_t])}\n")
             foutw.write(f"{','.join([str(x) for x in hyplap.measure_to_weighted(x_t, H)])}\n")
-        grad = -hypergraph_measure_mc_laplacian(x_t, H, debug=debug)
-        x_t += step * grad
+
+        # Apply the diffusion operator
+        grad_hyp = -hypergraph_measure_mc_laplacian(x_t, H, debug=debug)
+        grad_clique = - L_clique @ x_t
+        grad_combined = (1 - eps_t) * grad_hyp + eps_t * grad_clique
+        x_t += step * grad_combined
 
         if normalise:
             x_t = x_t / (x_t @ x_t)
@@ -512,7 +517,7 @@ def main():
     #  50s: Look at random 2-colorable graphs
     #  60s: Search (!) for 2-colorable graphs with bad algorithm results
     example = 50
-    n = 100
+    n = 50
     show_hypergraph = False
     show_diffusion = True
 
@@ -674,14 +679,14 @@ def main():
         s[1] = 1
 
         # Run the heat diffusion process
-        _ = sim_mc_heat_diff(s, H, 20,
-                             step=1,
+        _ = sim_mc_heat_diff(s, H, 100,
+                             step=0.1,
                              print_measure=False,
                              print_time=True,
                              plot_diff=show_diffusion,
                              save_diffusion_data=False,
                              normalise=False,
-                             start_epsilon=0)
+                             start_epsilon=1)
 
     if example == 60:
         # Run some experiments
