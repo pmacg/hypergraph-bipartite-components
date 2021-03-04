@@ -115,13 +115,21 @@ def get_clique_graph(H):
         G.add_node(vertex)
 
     # Add the edges to the graph
+    new_edges = {}
     for edge in H.edges():
         vertices = [vertex for vertex in edge]
         rank = len(vertices)
-        new_edges = []
         for v1_idx in range(rank):
             for v2_idx in range(v1_idx + 1, rank):
-                new_edges.append((vertices[v1_idx], vertices[v2_idx], {'weight': 1 / (rank - 1)}))
-        G.add_edges_from(new_edges)
+                new_edge = (vertices[v1_idx], vertices[v2_idx])
+                new_weight = 1 / (rank - 1)
+                if new_edge in new_edges:
+                    new_edges[new_edge] = new_edges[new_edge] + new_weight
+                else:
+                    new_edges[new_edge] = new_weight
+    new_edges_list = []
+    for new_edge in new_edges:
+        new_edges_list.append((new_edge[0], new_edge[1], {'weight': new_edges[new_edge]}))
+    G.add_edges_from(new_edges_list)
 
     return G
