@@ -464,7 +464,7 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
 
         # Plot the functions
         if not normalise:
-            line1 = ax1.plot(t_steps[:len(ft)], ft)
+            # line1 = ax1.plot(t_steps[:len(ft)], ft)
             # line2 = ax2.plot(t_steps[:len(mlogft)], mlogft, color='tab:green')
             line4 = ax1.plot(t_steps[:len(ht)], ht)
         line3 = ax1.plot(t_steps[:len(gt)], gt)
@@ -472,8 +472,10 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
         # Add legend and show plot
         if not normalise:
             # ax2.legend(line1 + line2 + line3 + line4, ("F(t) = \\rho_t^T D^{-1} \\rho_t", "- log F(t)", "G(t) = d/dt - log F(t)", "h(t) = -d/dt G(t)"))
-            ax2.legend(line1 + line3 + line4,
-                       ("F(t) = \\rho_t^T D^{-1} \\rho_t", "G(t) = d/dt - log F(t)", "h(t) = -d/dt G(t)"))
+            # ax2.legend(line1 + line3 + line4,
+            #            ("F(t) = \\rho_t^T D^{-1} \\rho_t", "G(t) = d/dt - log F(t)", "h(t) = -d/dt G(t)"))
+            ax2.legend(line3 + line4,
+                       ("G(t) = d/dt - log F(t)", "h(t) = -d/dt G(t)"))
         fig.tight_layout()
         plt.show()
 
@@ -674,12 +676,15 @@ def main():
             if not show_diffusion:
                 plt.show()
 
-        # Create the starting vector
-        s = np.zeros(2*n)
-        s[1] = 1
+        # Create the starting vector - start at the minimum eigenvector of the clique graph operator
+        L_clique = graph_diffusion_operator(hypconstruct.get_clique_graph(H))
+        eigs, eigvecs = sp.sparse.linalg.eigsh(L_clique, k=1, which='SM')
+        s = eigvecs[:, 0]
+        # s = np.zeros(2*n)
+        # s[1] = 1
 
         # Run the heat diffusion process
-        _ = sim_mc_heat_diff(s, H, 100,
+        _ = sim_mc_heat_diff(s, H, 30,
                              step=0.1,
                              print_measure=False,
                              print_time=True,
