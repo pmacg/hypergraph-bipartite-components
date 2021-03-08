@@ -76,6 +76,8 @@ def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
     attempts = 0
     while not connected:
         attempts += 1
+        if attempt_limit >= attempts > 1:
+            print(f"Failed to create a connected graph. Attempts: {attempts - 1}.")
         if attempts > attempt_limit:
             # We've failed to make a connected graph.
             print("WARNING: failed to make a connected graph. Try increasing the number or rank of the edges.")

@@ -519,7 +519,7 @@ def main():
     #  50s: Look at random 2-colorable graphs
     #  60s: Search (!) for 2-colorable graphs with bad algorithm results
     example = 50
-    n = 50
+    n = 300
     show_hypergraph = False
     show_diffusion = True
 
@@ -685,13 +685,13 @@ def main():
 
         # Run the heat diffusion process
         _ = sim_mc_heat_diff(s, H, 30,
-                             step=0.1,
+                             step=1,
                              print_measure=False,
                              print_time=True,
                              plot_diff=show_diffusion,
                              save_diffusion_data=False,
                              normalise=False,
-                             start_epsilon=1)
+                             start_epsilon=0)
 
     if example == 60:
         # Run some experiments
