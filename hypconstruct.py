@@ -90,10 +90,18 @@ def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
 
         # Store the edge information for constructing the graph
         hyp_dict = {}
+        i = 0   # Edge must contain node i
         for e in edges:
-            side_a_nodes = random.sample(nodes_a, r)
-            side_b_nodes = random.sample(nodes_b, r)
+            if i < n1:
+                side_a_nodes = random.sample([node for node in nodes_a if node != nodes_a[i]], r - 1) + [nodes_a[i]]
+                side_b_nodes = random.sample(nodes_b, r)
+            else:
+                side_a_nodes = random.sample(nodes_a, r)
+                side_b_nodes = random.sample([node for node in nodes_b if node != nodes_b[i - n1]], r - 1) + [nodes_b[i - n1]]
             hyp_dict[e] = side_a_nodes + side_b_nodes
+            i += 1
+            if i >= n1 + n2:
+                i = 0
 
         h = hnx.Hypergraph(hyp_dict)
         connected = h.is_connected() and len(h.nodes) == (n1 + n2)
