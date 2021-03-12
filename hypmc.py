@@ -419,7 +419,7 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
         mlogft.append(- math.log(this_ft))
         x_tn = x_t / this_ft
         this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ hypergraph_measure_mc_laplacian(x_tn, H)) / (
-                   x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_tn)
+                x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_tn)
         gt.append(this_gt)
         if len(gt) > 2:
             ht.append((gt[-2] - gt[-1])/step)
@@ -446,7 +446,7 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
     this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_t
     x_tn = x_t / this_ft
     final_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ hypergraph_measure_mc_laplacian(x_tn, H)) / (
-                x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_tn)
+            x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(H)) @ x_tn)
     if print_time or print_measure:
         print(f"Final value of G(t): {final_gt:.5f}")
 

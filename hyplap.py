@@ -6,97 +6,96 @@ import networkx as nx
 import hypernetx as hnx
 import numpy as np
 import matplotlib.pyplot as plt
-import hypconstruct
-import hypcheeg
 import sys
 from scipy.optimize import linprog
 
 
-def hypergraph_degree_mat(H):
+def hypergraph_degree_mat(hypergraph):
     """
     Given a hypergraph H, compute the degree matrix containing the degree of each vertex on the diagonal.
-    :param H:
+    :param hypergraph:
     :return: A numpy matrix containing the degrees.
     """
     # Get the vertices from the hypergraph
-    V = H.nodes
-    n = len(V)
+    vertices = hypergraph.nodes
+    n = len(vertices)
 
     # Construct the empty matrix whose diagonal we will fill.
-    W = np.zeros((n, n))
-    for vidx, vname in enumerate(V):
-        W[vidx, vidx] = H.degree(vname)
-    return W
+    degree_matrix = np.zeros((n, n))
+    for vertex_index, vertex_name in enumerate(vertices):
+        degree_matrix[vertex_index, vertex_index] = hypergraph.degree(vertex_name)
+    return degree_matrix
 
 
 # =======================================================
 # Convert between measure, weighted and normalised space
 # =======================================================
-def measure_to_weighted(phi, H):
+def measure_to_weighted(phi, hypergraph):
     """
     Givena vector in the measure space, compute the corresponding vector in the weighted space.
             f = W^{-1} x
     :param phi: The vector in the measure space to be converted.
-    :param H: The underlying hypergraph.
+    :param hypergraph: The underlying hypergraph.
     :return: The vector f in the weighted space.
     """
-    return np.linalg.pinv(hypergraph_degree_mat(H)) @ phi
+    return np.linalg.pinv(hypergraph_degree_mat(hypergraph)) @ phi
 
 
-def weighted_to_normalized(f, H):
-    return np.sqrt(hypergraph_degree_mat(H)) @ f
+def weighted_to_normalized(f, hypergraph):
+    return np.sqrt(hypergraph_degree_mat(hypergraph)) @ f
 
 
-def normalized_to_measure(x, H):
-    return np.sqrt(hypergraph_degree_mat(H)) @ x
+def normalized_to_measure(x, hypergraph):
+    return np.sqrt(hypergraph_degree_mat(hypergraph)) @ x
 
 
-def measure_to_normalized(phi, H):
-    return weighted_to_normalized(measure_to_weighted(phi, H), H)
+def measure_to_normalized(phi, hypergraph):
+    return weighted_to_normalized(measure_to_weighted(phi, hypergraph), hypergraph)
 
 
-def normalized_to_weighted(x, H):
-    return measure_to_weighted(normalized_to_measure(x, H), H)
+def normalized_to_weighted(x, hypergraph):
+    return measure_to_weighted(normalized_to_measure(x, hypergraph), hypergraph)
 
 
-def weighted_to_measure(f, H):
-    return normalized_to_measure(weighted_to_normalized(f, H), H)
+def weighted_to_measure(f, hypergraph):
+    return normalized_to_measure(weighted_to_normalized(f, hypergraph), hypergraph)
 
 
-def compute_edge_info(f, H, debug=False):
+def compute_edge_info(f, hypergraph, debug=False):
     """
     Given a hypergraph H and weighted vector f, compute a dictionary with the following information for each edge in H:
-        (Ie, Se, max_{u, v \in e} (f(u) - f(v), [vertices])
+        (Ie, Se, max_{u, v \\in e} (f(u) - f(v), [vertices])
     :param f: A vector in the normalised space
-    :param H: The underlying hypergraph
+    :param hypergraph: The underlying hypergraph
+    :param debug: Whether to print debug info
     :return: a dictionary with the above information for each edge in the hypergraph.
     """
-    maxf = max(f)
-    minf = min(f)
+    max_f = max(f)
+    min_f = min(f)
     if debug:
         print('f', f)
-        print('maxf', maxf, 'minf', minf)
+        print('max_f', max_f, 'min_f', min_f)
     edge_info = {}
 
     # Compute a dictionary of vertex names and vertex ids
-    vname_to_vidx = {}
-    for vidx, vname in enumerate(H.nodes):
-        vname_to_vidx[vname] = vidx
+    vertex_name_to_index = {}
+    for vertex_index, vertex_name in enumerate(hypergraph.nodes):
+        vertex_name_to_index[vertex_name] = vertex_index
     if debug:
-        print('vname_to_vidx', vname_to_vidx)
+        print('vertex_name_to_index', vertex_name_to_index)
 
-    for e in H.edges():
+    for edge in hypergraph.edges():
         if debug:
-            print("Processing edge:", e)
+            print("Processing edge:", edge)
         # Compute the maximum and minimum sets for the edge.
         Ie = []
-        mine = maxf
+        mine = max_f
         Se = []
-        maxe = minf
-        for v in e.elements:
+        maxe = min_f
+        for v in edge.elements:
             if debug:
                 print("Considering vertex:", v)
-            fv = f[vname_to_vidx[v]]
+            fv = f[vertex_name_to_index[v]]
             if debug:
                 print("fv", fv)
 
@@ -120,7 +119,7 @@ def compute_edge_info(f, H, debug=False):
                 Se.append(v)
             if debug:
                 print("Ie", Ie, "Se", Se)
-        edge_info[e.uid] = (Ie, Se, maxe - mine, e.elements)
+        edge_info[edge.uid] = (Ie, Se, maxe - mine, edge.elements)
     if debug:
         print("Returning:", edge_info)
     return edge_info
@@ -399,29 +398,6 @@ def hypergraph_lap_conn_graph(phi, H):
         for u in einfo[0]:
             for v in einfo[1]:
                 G.add_edge(u, v)
-
-    return G
-
-
-def hypergraph_clique_graph(H):
-    """
-    Given a hypergraph H, construct the 'clique graph' formed by replacing each hyperedge with a clique.
-    :param H:
-    :return:
-    """
-    edge_info = compute_edge_info(f, H)
-    G = nx.Graph()
-
-    # Add the vertices
-    for v in H.nodes:
-        G.add_node(v)
-
-    # Add the edges
-    for e, einfo in edge_info.items():
-        for u in einfo[3]:
-            for v in einfo[3]:
-                if u != v:
-                    G.add_edge(u, v)
 
     return G
 
