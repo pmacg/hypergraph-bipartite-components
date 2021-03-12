@@ -519,7 +519,7 @@ def main():
     #  50s: Look at random 2-colorable graphs
     #  60s: Search (!) for 2-colorable graphs with bad algorithm results
     example = 50
-    n = 300
+    n = 500
     show_hypergraph = False
     show_diffusion = True
 
@@ -666,7 +666,7 @@ def main():
                              normalise=False)
 
     if example == 50:
-        H = hypconstruct.construct_hyp_2_colorable(n, n, 3*n, 2)
+        H = hypconstruct.construct_hyp_2_colorable(n, n, 2*n, 2)
 
         # Plot the hypergraph
         if show_hypergraph:
@@ -677,11 +677,11 @@ def main():
                 plt.show()
 
         # Create the starting vector - start at the minimum eigenvector of the clique graph operator
-        L_clique = graph_diffusion_operator(hypconstruct.get_clique_graph(H))
-        eigs, eigvecs = sp.sparse.linalg.eigsh(L_clique, k=1, which='SM')
-        s = eigvecs[:, 0]
-        # s = np.zeros(2*n)
-        # s[1] = 1
+        # L_clique = graph_diffusion_operator(hypconstruct.get_clique_graph(H))
+        # eigs, eigvecs = sp.sparse.linalg.eigsh(L_clique, k=1, which='SM')
+        # s = eigvecs[:, 0]
+        s = np.zeros(2*n)
+        s[1] = 1
 
         # Run the heat diffusion process
         _ = sim_mc_heat_diff(s, H, 30,
