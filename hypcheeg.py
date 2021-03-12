@@ -1,239 +1,158 @@
 """
 This file implements various methods for studying the spectral properties of hypergraphs and their related graphs.
 """
-import networkx as nx
 import numpy as np
-import random
 
 
-def graph_cutsize(G, S):
+def graph_cut_size(graph, vertex_set):
     """
     Compute the cut size of a set S in a graph
-    :param G: The graph
-    :param S: The vertex set in question
-    :return: The size of cut(S, V \ S)
+    :param graph: The graph as a networkx object
+    :param vertex_set: The vertex set in question, as a list
+    :return: The size of cut(S, V - S)
     """
-    cutsize = 0
+    cut_size = 0
 
     # Iterate through the edges to find those in the cut
-    for e in G.edges():
-        e_intersect_S = [u for u in e if u in S]
-        e_minus_S = [u for u in e if u not in S]
+    for edge in graph.edges():
+        edge_intersects_vertex_set = len([v for v in edge if v in vertex_set]) > 0
+        edge_entirely_inside_vertex_set = len([v for v in edge if v not in vertex_set]) == 0
 
         # If this edge is on the cut, add one to the total
-        if len(e_intersect_S) > 0 and len(e_minus_S) > 0:
-            cutsize += 1
+        if edge_intersects_vertex_set and not edge_entirely_inside_vertex_set:
+            cut_size += 1
 
-    return cutsize
+    return cut_size
 
 
-def hyp_cutsize(H, S):
+def hypergraph_cut_size(hypergraph, vertex_set):
     """
     Compute the cut size of a set S in a hypergraph.
-    :param H: The hypergraph
-    :param S: The vertex set in question
-    :return: The size of cut(S, V \ S)
+    :param hypergraph: The hypergraph as a hypernetx object.
+    :param vertex_set: The vertex set in question, as a list
+    :return: The size of cut(S, V - S)
     """
-    cutsize = 0
+    cut_size = 0
 
     # Iterate through the edges to find those in the cut
-    for e in H.edges():
-        e_intersect_S = [u for u in e.elements if u in S]
-        e_minus_S = [u for u in e.elements if u not in S]
+    for edge in hypergraph.edges():
+        edge_intersects_vertex_set = len([v for v in edge.elements if v in vertex_set]) > 0
+        edge_entirely_inside_vertex_set = len([v for v in edge.elements if v not in vertex_set]) == 0
 
         # If this edge is on the cut, add one to the total
-        if len(e_intersect_S) > 0 and len(e_minus_S) > 0:
-            cutsize += 1
+        if edge_intersects_vertex_set and not edge_entirely_inside_vertex_set:
+            cut_size += 1
 
-    return cutsize
+    return cut_size
 
 
-def hyp_volume(H, S, complement=False):
+def hypergraph_volume(hypergraph, vertex_set, complement=False):
     """
     Compute the volume of a set S in a hypergraph.
-    :param H: The hypergraph
-    :param S: The vertex set
+    :param hypergraph: The hypergraph as a hypernetx object
+    :param vertex_set: The vertex set as a list
     :param complement: Whether to find the volume of the set complement instead
     :return: vol(S)
     """
     total_vol = 0
-    for v in H.nodes:
-        if v in S and not complement:
-            total_vol += H.degree(v)
-        if v not in S and complement:
-            total_vol += H.degree(v)
+    for vertex in hypergraph.nodes:
+        if vertex in vertex_set and not complement:
+            total_vol += hypergraph.degree(vertex)
+        if vertex not in vertex_set and complement:
+            total_vol += hypergraph.degree(vertex)
 
     return total_vol
 
 
-def hyp_conductance(H, S):
+def hypergraph_conductance(hypergraph, vertex_set):
     """
     Given a hypergraph H and a set of vertices S, compute the conductance of the set S given by
-        phi(S) = cut(S, V \ S) / vol(S)
-    :param H: The hypergraph
-    :param S: A subset of the vertices
+        phi(S) = cut(S, V - S) / vol(S)
+    :param hypergraph: The hypergraph as a hypernetx object
+    :param vertex_set: A subset of the vertices, as a list
     :return: The conductance of the set S in the graph H
     """
-    cut = hyp_cutsize(H, S)
-    vol_S = hyp_volume(H, S)
-    vol_Sbar = hyp_volume(H, S, complement=True)
-    if min(vol_S, vol_Sbar) > 0:
-        return cut / min(vol_S, vol_Sbar)
+    cut = hypergraph_cut_size(hypergraph, vertex_set)
+    vol_s = hypergraph_volume(hypergraph, vertex_set)
+    vol_s_complement = hypergraph_volume(hypergraph, vertex_set, complement=True)
+    if min(vol_s, vol_s_complement) > 0:
+        return cut / min(vol_s, vol_s_complement)
     else:
         return 1
 
 
-def hyp_sweep_set(x, H, debug=False):
+def hypergraph_sweep_set(x, hypergraph):
     """
     Perform a sweep set procedure for a hypergraph in order to find a cut with low conductance.
     :param x: The vector to sweep over
-    :param H: The underlying hypergraph
+    :param hypergraph: The underlying hypergraph, as a hypernetx object
     :return: The set with the smallest conductance found by sweeping over the vector x.
     """
-    V = [v.uid for v in H.nodes()]
-    best_S = []
-    best_cond = 1
-    current_S = []
+    all_vertices = [v.uid for v in hypergraph.nodes()]
+    best_set = []
+    best_conductance = 1
+    current_set = []
 
     # Get the sorted indices of x, in order highest to lowest
     ordering = reversed(np.argsort(x))
 
     # Perform the sweep
-    for vidx in ordering:
+    for vertex_index in ordering:
         # Add the next vertex to the candidate set S
-        current_S.append(V[vidx])
-        if debug:
-            print("Checking sweep set: ", current_S)
-        phi = hyp_conductance(H, current_S)
-        if debug:
-            print("Conductance:", phi)
-        if phi < best_cond:
-            if debug:
-                print("Updating best conductance.")
-            best_cond = phi
-            best_S = np.copy(current_S)
+        current_set.append(all_vertices[vertex_index])
+        phi = hypergraph_conductance(hypergraph, current_set)
+        if phi < best_conductance:
+            best_conductance = phi
+            best_set = np.copy(current_set)
 
     # Return the best set we found
-    return best_S
+    return best_set
 
 
-def hyp_common_edges(u, v, H):
+def hypergraph_common_edges(u, v, hypergraph):
     """
     Return the number of common edges between the vertices u and v in the hypergraph H.
     :param u: A vertex
     :param v: A vertex
-    :param H: The hypergraph
+    :param hypergraph: The hypergraph
     :return: The number of edges in H containing both u and v
     """
     total = 0
-    for e in H.edges():
+    for e in hypergraph.edges():
         if u in e.elements and v in e.elements:
             total += 1
     return total
 
 
-def hyp_min_edges_graph(H):
-    """
-    Given a hypergraph, construct a graph by replacing each hyperedge with a single edge joining the vertices with the
-    fewest overlapping edges.
-    :param H: The hypergrpah in question
-    :return:
-    """
-    G = nx.Graph()
-
-    # Add the vertices
-    n = 0
-    for v in H.nodes:
-        n += 1
-        G.add_node(v)
-
-    # Add the edges
-    for e in H.edges():
-        fewest = None
-        edge = None
-        for u in e.elements:
-            for v in e.elements:
-                if u != v:
-                    if fewest is None or hyp_common_edges(u, v, H) < fewest:
-                        fewest = hyp_common_edges(u, v, H)
-                        edge = (u, v)
-        G.add_edge(edge[0], edge[1])
-
-    return G
-
-
-def graph_self_loop_conductance(S, G, H):
+def graph_self_loop_conductance(vertex_set, graph, hypergraph):
     """
     Given a graph, assuming that each vertex is given a self loop in order to give the vertex the same degree as it has
     in H, return the conductance of a set.
-    :param S: The vertex set to find the conductance of
-    :param G: The simple graph
-    :param H: The hypergraph
+    :param vertex_set: The vertex set to find the conductance of
+    :param graph: The simple graph
+    :param hypergraph: The hypergraph
     :return: The conductance of the set S in G assuming each vertex has appropriate self-loops
     """
-    vol_S = hyp_volume(H, S)
-    vol_Sbar = hyp_volume(H, S, complement=True)
-    cut_S = graph_cutsize(G, S)
+    vol_s = hypergraph_volume(hypergraph, vertex_set)
+    vol_s_complement = hypergraph_volume(hypergraph, vertex_set, complement=True)
+    cut_s = graph_cut_size(graph, vertex_set)
 
-    if min(vol_S, vol_Sbar) == 0:
+    if min(vol_s, vol_s_complement) == 0:
         return 1
     else:
-        return cut_S / min(vol_S, vol_Sbar)
+        return cut_s / min(vol_s, vol_s_complement)
 
 
-def hyp_weighted_degree(v, H):
+def hypergraph_weighted_degree(vertex, hypergraph):
     """
     Compute a 'weighted' degree for v in the hypergraph H.
     d_v(e) = w(e) / r(e)
-    :param v: the vertex of interest
-    :param H: The underlying hypergraph
+    :param vertex: the vertex of interest
+    :param hypergraph: The underlying hypergraph
     :return: the degree of the vertex
     """
     total_degree = 0
-    for e in H.edges():
-        if v in e.elements:
+    for e in hypergraph.edges():
+        if vertex in e.elements:
             total_degree += (1 / len(e.elements))
     return total_degree
-
-
-def hyp_degree_graph(H, c=1, debug=False):
-    """
-    Construct a simple graph by sampling based on vertex degrees.
-    :param H: The hypergraph
-    :param c: A parameter to the random process. Roughly the number of vertices to select a single hyperedge.
-    :return: A graph G
-    """
-    G = nx.Graph()
-    m = len([e for e in H.edges()])
-    n = len([v for v in H.nodes()])
-
-    random.seed()
-
-    # Add the vertices
-    i = 0
-    for v in H.nodes:
-        i += 1
-        G.add_node(v)
-
-    # Add the edges
-    for e in H.edges():
-        # For each vertex in e, check whether the vertex randomly selects e.
-        chosen_vertices = {}
-        for u in e.elements:
-            # The probability of choosing this edge is
-            p = c * (m / n) * (1 / len(e.elements)) * (1 / hyp_weighted_degree(u, H))
-            if random.random() <= p:
-                chosen_vertices[u] = p
-
-        if debug:
-            print(f"Vertices which chose edge {e}: {[v for v in chosen_vertices.keys()]}")
-
-        # Add a clique on the chosen vertices
-        processed = []
-        for u, pu in chosen_vertices.items():
-            processed.append(u)
-            for v, pv in chosen_vertices.items():
-                if v not in processed:
-                    G.add_edge(u, v, weight=(pu + pv - (pu * pv)))
-
-    return G
