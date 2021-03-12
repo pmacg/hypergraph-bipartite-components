@@ -2,6 +2,7 @@
 Construct some hypergraphs with certain properties.
 """
 import hypernetx as hnx
+import networkx as nx
 import random
 import math
 
@@ -75,6 +76,8 @@ def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
     attempts = 0
     while not connected:
         attempts += 1
+        if attempt_limit >= attempts > 1:
+            print(f"Failed to create a connected graph. Attempts: {attempts - 1}.")
         if attempts > attempt_limit:
             # We've failed to make a connected graph.
             print("WARNING: failed to make a connected graph. Try increasing the number or rank of the edges.")
@@ -87,10 +90,18 @@ def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
 
         # Store the edge information for constructing the graph
         hyp_dict = {}
+        i = 0   # Edge must contain node i
         for e in edges:
-            side_a_nodes = random.sample(nodes_a, r)
-            side_b_nodes = random.sample(nodes_b, r)
+            if i < n1:
+                side_a_nodes = random.sample([node for node in nodes_a if node != nodes_a[i]], r - 1) + [nodes_a[i]]
+                side_b_nodes = random.sample(nodes_b, r)
+            else:
+                side_a_nodes = random.sample(nodes_a, r)
+                side_b_nodes = random.sample([node for node in nodes_b if node != nodes_b[i - n1]], r - 1) + [nodes_b[i - n1]]
             hyp_dict[e] = side_a_nodes + side_b_nodes
+            i += 1
+            if i >= n1 + n2:
+                i = 0
 
         h = hnx.Hypergraph(hyp_dict)
         connected = h.is_connected() and len(h.nodes) == (n1 + n2)
@@ -98,3 +109,37 @@ def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
     # Return the final hypergraph
     #print(f"Constructed hypergraph: {hyp_dict}")
     return h
+
+
+def get_clique_graph(H):
+    """
+    Given a hypergraph, H, return the networkx graph corresponding to the clique graph of H.
+    The clique graph is constructed by replacing each hyperedge e with a clique with edges of weight 1/(r(e) - 1).
+    :param H:
+    :return: A networkx graph G
+    """
+    G = nx.Graph()
+
+    # Add the vertices to the graph
+    for vertex in H.nodes:
+        G.add_node(vertex)
+
+    # Add the edges to the graph
+    new_edges = {}
+    for edge in H.edges():
+        vertices = [vertex for vertex in edge]
+        rank = len(vertices)
+        for v1_idx in range(rank):
+            for v2_idx in range(v1_idx + 1, rank):
+                new_edge = (vertices[v1_idx], vertices[v2_idx])
+                new_weight = 1 / (rank - 1)
+                if new_edge in new_edges:
+                    new_edges[new_edge] = new_edges[new_edge] + new_weight
+                else:
+                    new_edges[new_edge] = new_weight
+    new_edges_list = []
+    for new_edge in new_edges:
+        new_edges_list.append((new_edge[0], new_edge[1], {'weight': new_edges[new_edge]}))
+    G.add_edges_from(new_edges_list)
+
+    return G
