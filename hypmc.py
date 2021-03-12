@@ -5,6 +5,7 @@ import math
 import hyplap
 import hypconstruct
 import hypcheeg
+import hypreductions
 import numpy as np
 from scipy.optimize import linprog
 import scipy as sp
@@ -379,7 +380,7 @@ def sim_mc_heat_diff(phi, H, T=1, step=0.1, debug=False, plot_diff=False, save_d
 
     # Construct the clique graph and its laplacian operator
     n = H.number_of_nodes()
-    G = hypconstruct.get_clique_graph(H)
+    G = hypreductions.hypergraph_clique_reduction(H)
     L_clique = graph_diffusion_operator(G)
 
     # Open the text file to write
@@ -493,7 +494,7 @@ def check_random_2_color_graph(n, m, r, t, eps):
     :param eps: The update step size during the diffusion process
     :return: Tuple described above
     """
-    H = hypconstruct.construct_hyp_2_colorable(n, n, m, r)
+    H = hypconstruct.construct_2_colorable_hypergraph(n, n, m, r)
 
     # Create the starting vector
     s = np.zeros(2 * n)
@@ -519,8 +520,8 @@ def main():
     #  50s: Look at random 2-colorable graphs
     #  60s: Search (!) for 2-colorable graphs with bad algorithm results
     example = 50
-    n = 500
-    show_hypergraph = False
+    n = 10
+    show_hypergraph = True
     show_diffusion = True
 
     if example == 1:
@@ -595,7 +596,7 @@ def main():
                     'e123': [12, 10],
                 })
         elif example == 31:
-            H = hypconstruct.construct_hyp_2_colorable(n, n, 6 * n, 1)
+            H = hypconstruct.construct_2_colorable_hypergraph(n, n, 6 * n, 1)
 
         # Draw the hypergraph
         if show_hypergraph:
@@ -666,7 +667,7 @@ def main():
                              normalise=False)
 
     if example == 50:
-        H = hypconstruct.construct_hyp_2_colorable(n, n, 2*n, 2)
+        H = hypconstruct.construct_2_colorable_hypergraph(n, n, 2 * n, 3)
 
         # Plot the hypergraph
         if show_hypergraph:

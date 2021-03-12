@@ -1,13 +1,11 @@
 """
-Construct some hypergraphs with certain properties.
+Various methods for constructing hypergraphs.
 """
 import hypernetx as hnx
-import networkx as nx
 import random
-import math
 
 
-def construct_hyp_low_cond(n1, n2, m, r, p1, p2):
+def construct_low_conductance_hypergraph(n1, n2, m, r, p1, p2):
     """
     Construct a hypergraph with a low conductance cut.
     :param n1: The number of vertices on side A of the cut
@@ -20,8 +18,8 @@ def construct_hyp_low_cond(n1, n2, m, r, p1, p2):
     """
     # Create a list of edge and node names
     edges = ['e' + str(i) for i in range(1, m+1)]
-    nodesA = ['a' + str(i) for i in range(1, n1 + 1)]
-    nodesB = ['b' + str(i) for i in range(1, n2 + 1)]
+    nodes_a = ['a' + str(i) for i in range(1, n1 + 1)]
+    nodes_b = ['b' + str(i) for i in range(1, n2 + 1)]
 
     # Seed the RNG
     random.seed()
@@ -32,20 +30,20 @@ def construct_hyp_low_cond(n1, n2, m, r, p1, p2):
         # Decide whether this edges will cross the cut
         if random.random() < p1:
             # This edge may cross the cut
-            hyp_dict[e] = random.sample(nodesA + nodesB, r)
+            hyp_dict[e] = random.sample(nodes_a + nodes_b, r)
         else:
             # Decide whether it should be on the left or the right side of the cut
             if random.random() < p2:
-                hyp_dict[e] = random.sample(nodesA, r)
+                hyp_dict[e] = random.sample(nodes_a, r)
             else:
-                hyp_dict[e] = random.sample(nodesB, r)
+                hyp_dict[e] = random.sample(nodes_b, r)
 
     # Return the final hypergraph
     print(f"Constructed hypergraph: {hyp_dict}")
     return hnx.Hypergraph(hyp_dict)
 
 
-def random_hypergraph(n, m, r):
+def construct_random_hypergraph(n, m, r):
     """
     Construct a completely random hypergraph.
     :param n: The number of nodes
@@ -53,16 +51,16 @@ def random_hypergraph(n, m, r):
     :param r: The rank of each edge
     :return:
     """
-    return construct_hyp_low_cond(n, 0, m, r, 0, 1)
+    return construct_low_conductance_hypergraph(n, 0, m, r, 0, 1)
 
 
-def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
+def construct_2_colorable_hypergraph(n1, n2, m, r, attempt_limit=100):
     """
-    Construct a hypergraph with a low conductance cut. Guarantees that the graph is connected.
+    Construct a 2-colorable hypergraph. Guarantees that the graph is connected.
     :param n1: The number of vertices on side A of the cut
     :param n2: The number of vertices on side B of the cut
     :param m: The number of edges in the graph
-    :param r: Half the rank of each edge
+    :param r: The rank of each edge
     :param attempt_limit: How many times to try constructing a graph before giving up
     :return: The hypergraph object constructed.
     """
@@ -71,8 +69,7 @@ def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
 
     # Try until we are connected
     connected = False
-    hyp_dict = None
-    h = None
+    new_hypergraph = None
     attempts = 0
     while not connected:
         attempts += 1
@@ -92,54 +89,26 @@ def construct_hyp_2_colorable(n1, n2, m, r, attempt_limit=100):
         hyp_dict = {}
         i = 0   # Edge must contain node i
         for e in edges:
+            # Add one node from each side of the cut to begin with
+            new_edge = []
             if i < n1:
-                side_a_nodes = random.sample([node for node in nodes_a if node != nodes_a[i]], r - 1) + [nodes_a[i]]
-                side_b_nodes = random.sample(nodes_b, r)
+                new_edge.append(nodes_a[i])
+                new_edge.append(random.choice(nodes_b))
             else:
-                side_a_nodes = random.sample(nodes_a, r)
-                side_b_nodes = random.sample([node for node in nodes_b if node != nodes_b[i - n1]], r - 1) + [nodes_b[i - n1]]
-            hyp_dict[e] = side_a_nodes + side_b_nodes
+                new_edge.append(nodes_b[i - n1])
+                new_edge.append(random.choice(nodes_a))
+
+            # Now, add remaining vertices from anywhere.
+            new_edge = new_edge + random.sample([v for v in (nodes_a + nodes_b) if v not in new_edge], r - 2)
+            hyp_dict[e] = new_edge
+
+            # Next iteration must include the next vertex
             i += 1
             if i >= n1 + n2:
                 i = 0
 
-        h = hnx.Hypergraph(hyp_dict)
-        connected = h.is_connected() and len(h.nodes) == (n1 + n2)
+        new_hypergraph = hnx.Hypergraph(hyp_dict)
+        connected = new_hypergraph.is_connected() and len(new_hypergraph.nodes) == (n1 + n2)
 
     # Return the final hypergraph
-    #print(f"Constructed hypergraph: {hyp_dict}")
-    return h
-
-
-def get_clique_graph(H):
-    """
-    Given a hypergraph, H, return the networkx graph corresponding to the clique graph of H.
-    The clique graph is constructed by replacing each hyperedge e with a clique with edges of weight 1/(r(e) - 1).
-    :param H:
-    :return: A networkx graph G
-    """
-    G = nx.Graph()
-
-    # Add the vertices to the graph
-    for vertex in H.nodes:
-        G.add_node(vertex)
-
-    # Add the edges to the graph
-    new_edges = {}
-    for edge in H.edges():
-        vertices = [vertex for vertex in edge]
-        rank = len(vertices)
-        for v1_idx in range(rank):
-            for v2_idx in range(v1_idx + 1, rank):
-                new_edge = (vertices[v1_idx], vertices[v2_idx])
-                new_weight = 1 / (rank - 1)
-                if new_edge in new_edges:
-                    new_edges[new_edge] = new_edges[new_edge] + new_weight
-                else:
-                    new_edges[new_edge] = new_weight
-    new_edges_list = []
-    for new_edge in new_edges:
-        new_edges_list.append((new_edge[0], new_edge[1], {'weight': new_edges[new_edge]}))
-    G.add_edges_from(new_edges_list)
-
-    return G
+    return new_hypergraph

@@ -74,3 +74,40 @@ def hypergraph_degree_graph_reduction(hypergraph, c=1):
                     new_graph.add_edge(u, v, weight=(pu + pv - (pu * pv)))
 
     return new_graph
+
+
+def hypergraph_clique_reduction(hypergraph):
+    """
+    Given a hypergraph, H, return the networkx graph corresponding to the clique graph of H.
+    The clique graph is constructed by replacing each hyperedge e with a clique with edges of weight 1/(r(e) - 1).
+    :param hypergraph:
+    :return: A networkx graph G
+    """
+    new_graph = nx.Graph()
+
+    # Add the vertices to the graph
+    for vertex in hypergraph.nodes:
+        new_graph.add_node(vertex)
+
+    # Add the edges to the graph. This dictionary will use tuples (u, v) as keys and store the total weight between u
+    # and v as the value.
+    new_edges = {}
+    for edge in hypergraph.edges():
+        edge_vertices = [vertex for vertex in edge]
+        rank = len(edge_vertices)
+        for vertex_index_1 in range(rank):
+            for vertex_index_2 in range(vertex_index_1 + 1, rank):
+                new_edge = (edge_vertices[vertex_index_1], edge_vertices[vertex_index_2])
+                new_weight = 1 / (rank - 1)
+                if new_edge in new_edges:
+                    new_edges[new_edge] = new_edges[new_edge] + new_weight
+                else:
+                    new_edges[new_edge] = new_weight
+
+    # Unroll this dictionary into a list of 3-tuples and add the edges to the new graph
+    new_edges_list = []
+    for new_edge in new_edges:
+        new_edges_list.append((new_edge[0], new_edge[1], {'weight': new_edges[new_edge]}))
+    new_graph.add_edges_from(new_edges_list)
+
+    return new_graph
