@@ -418,11 +418,10 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
         # Check for convergence
         if check_converged:
             gt_len = len(g_t)
-            if gt_len >= 30:
-                # Look at the values 1/3, 1/2, 2/3, 3/4, and the immediately previous one. All should be within a
-                # convergence error to say we have converged.
-                prev_gts = [g_t[int(gt_len / 3)], g_t[int(gt_len / 2)], g_t[int(2 * gt_len / 3)],
-                            g_t[int(3 * gt_len / 4)], g_t[gt_len - 2], this_gt]
+            if gt_len >= 11 / step:
+                # If we have gone for at least 11 time steps.
+                # Get the values of g(t) for 10 time steps ago, 5 time steps ago and 1 time step ago
+                prev_gts = [g_t[int((t - 10) / step)], g_t[int((t - 5) / step)], g_t[int((t - 1) / step)], this_gt]
                 diff = max(prev_gts) - min(prev_gts)
                 if diff < 0.0001:
                     # We have converged
@@ -488,7 +487,7 @@ def check_random_2_color_graph(n, m, r, t, eps):
 
 
 def main():
-    n = 10
+    n = 50
     m = 2 * n
     r = 3
     show_hypergraph = False
