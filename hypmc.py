@@ -4,10 +4,11 @@ This file contains code for computing the hypergraph max-cut laplacian operator.
 import math
 import hyplap
 import hypconstruct
+import hypalgorithms
 import numpy as np
 from scipy.optimize import linprog
 import scipy as sp
-import scipy.sparse
+import scipy.sparse.linalg
 import hypernetx as hnx
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -355,7 +356,6 @@ def graph_diffusion_operator(graph):
     n, m = adjacency_matrix.shape
     degrees = adjacency_matrix.sum(axis=1)
     degree_matrix = sp.sparse.spdiags(degrees.flatten(), [0], m, n, format="csr")
-    # noinspection PyUnresolvedReferences
     inverse_degree_matrix = sp.sparse.linalg.inv(degree_matrix)
     l_operator = sp.sparse.identity(n) + adjacency_matrix @ inverse_degree_matrix
     return l_operator
@@ -492,9 +492,6 @@ def main():
     m = 2 * n
     r = 3
     show_hypergraph = False
-    show_diffusion = True
-    max_t = 100
-    step_size = 0.1
 
     # Construct a hypergraph
     # hypergraph = hypconstruct.simple_two_edge_hypergraph()
@@ -505,17 +502,33 @@ def main():
     if show_hypergraph:
         hyp_fig = plt.figure(1)
         hnx.draw(hypergraph)
+        hyp_fig.show()
 
-        if not show_diffusion:
-            hyp_fig.show()
-
-    # Construct the starting vector
-    s = np.zeros(n)
-    s[0] = 1
-
-    # Run the diffusion process
-    _ = sim_mc_heat_diff(s, hypergraph, max_t, step=step_size, debug=False, plot_diff=show_diffusion,
-                         check_converged=True, print_time=True)
+    # Run the bipartiteness algorithms
+    print("Clique")
+    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_clique(hypergraph)
+    print(vertex_set_l)
+    print(vertex_set_r)
+    print(bipartiteness)
+    print()
+    print("Diffusion - Clique")
+    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(hypergraph)
+    print(vertex_set_l)
+    print(vertex_set_r)
+    print(bipartiteness)
+    print()
+    print("Random")
+    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_random(hypergraph)
+    print(vertex_set_l)
+    print(vertex_set_r)
+    print(bipartiteness)
+    print()
+    print("Diffusion - Random")
+    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(
+        hypergraph, use_random_initialisation=True)
+    print(vertex_set_l)
+    print(vertex_set_r)
+    print(bipartiteness)
 
 
 if __name__ == "__main__":
