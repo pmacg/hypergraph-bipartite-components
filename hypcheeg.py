@@ -143,6 +143,41 @@ def hypergraph_sweep_set(x, hypergraph):
     return best_set
 
 
+def hypergraph_two_sided_sweep(x, hypergraph):
+    """
+    Perform the two-sided sweep set procedure for a hypergraph in order to find a set with low bipartiteness.
+    :param x: The vector to sweep over
+    :param hypergraph: The underlying hypergraph, as a hypernetx object
+    :return: L, R - the pair of sets with the smallest bipartiteness found by sweeping over the vector x
+    """
+    all_vertices = [v.uid for v in hypergraph.nodes()]
+    best_l = []
+    best_r = []
+    best_bipartiteness = 1
+    current_l = []
+    current_r = []
+
+    # Get the sorted indices of x, in order of highest absolute value to lowest
+    ordering = reversed(np.argsort(abs(x)))
+
+    # Perform the sweep
+    for vertex_index in ordering:
+        # Add the next vertex to the candidate set
+        if x[vertex_index] >= 0:
+            current_r.append(all_vertices[vertex_index])
+        else:
+            current_l.append(all_vertices[vertex_index])
+
+        # Get the bipartiteness and check if it is best so far
+        beta = hypergraph_bipartiteness(hypergraph, current_l, current_r)
+        if beta < best_bipartiteness:
+            best_bipartiteness = beta
+            best_l = np.copy(current_l)
+            best_r = np.copy(current_r)
+
+    return best_l, best_r
+
+
 def hypergraph_common_edges(u, v, hypergraph):
     """
     Return the number of common edges between the vertices u and v in the hypergraph H.
