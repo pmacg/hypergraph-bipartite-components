@@ -112,3 +112,34 @@ def construct_2_colorable_hypergraph(n1, n2, m, r, attempt_limit=100):
 
     # Return the final hypergraph
     return new_hypergraph
+
+
+def simple_two_edge_hypergraph():
+    """
+    Construct and return a simple two-edge hypergraph.
+    :return:
+    """
+    return hnx.Hypergraph({'e1': [1, 2, 3], 'e2': [2, 3]})
+
+
+def simple_not_two_colorable_hypergraph():
+    """
+    Construct and return the simplest 3-uniform hypergraph that is not two colorable.
+    :return:
+    """
+    new_hypergraph = hnx.Hypergraph(
+        {
+            'e1': [1, 2, 3],
+            'e2': [1, 2, 4],
+            'e3': [1, 2, 5],
+            'e4': [3, 4, 5],
+            'e5': [2, 6, 7],
+            'e6': [2, 6, 8],
+            'e7': [2, 6, 9],
+            'e8': [7, 8, 9],
+            'e9': [6, 1, 10],
+            'e10': [6, 1, 11],
+            'e11': [6, 1, 12],
+            'e12': [10, 11, 12]
+        })
+    return new_hypergraph
