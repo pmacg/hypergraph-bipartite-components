@@ -419,9 +419,12 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
         if check_converged:
             gt_len = len(g_t)
             if gt_len >= 30:
-                prev_gt = g_t[int(gt_len / 3)]
-                diff = prev_gt - this_gt
-                if diff < 0.0000001:
+                # Look at the values 1/3, 1/2, 2/3, 3/4, and the immediately previous one. All should be within a
+                # convergence error to say we have converged.
+                prev_gts = [g_t[int(gt_len / 3)], g_t[int(gt_len / 2)], g_t[int(2 * gt_len / 3)],
+                            g_t[int(3 * gt_len / 4)], g_t[gt_len - 2], this_gt]
+                diff = max(prev_gts) - min(prev_gts)
+                if diff < 0.0001:
                     # We have converged
                     break
 
@@ -488,9 +491,9 @@ def main():
     n = 10
     m = 2 * n
     r = 3
-    show_hypergraph = True
+    show_hypergraph = False
     show_diffusion = True
-    max_t = 20
+    max_t = 100
     step_size = 0.1
 
     # Construct a hypergraph
