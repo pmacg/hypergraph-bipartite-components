@@ -172,8 +172,8 @@ def hypergraph_two_sided_sweep(x, hypergraph):
         beta = hypergraph_bipartiteness(hypergraph, current_l, current_r)
         if beta < best_bipartiteness:
             best_bipartiteness = beta
-            best_l = np.copy(current_l)
-            best_r = np.copy(current_r)
+            best_l = list(np.copy(current_l))
+            best_r = list(np.copy(current_r))
 
     return best_l, best_r
 
