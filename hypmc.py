@@ -491,7 +491,7 @@ def main():
     show_hypergraph = True
     show_diffusion = True
     max_t = 20
-    step_size = 0.01
+    step_size = 0.1
 
     # Construct a hypergraph
     # hypergraph = hypconstruct.simple_two_edge_hypergraph()
@@ -511,7 +511,8 @@ def main():
     s[0] = 1
 
     # Run the diffusion process
-    _ = sim_mc_heat_diff(s, hypergraph, max_t, step=step_size, debug=False, plot_diff=True, check_converged=True)
+    _ = sim_mc_heat_diff(s, hypergraph, max_t, step=step_size, debug=False, plot_diff=show_diffusion,
+                         check_converged=True, print_time=True)
 
 
 if __name__ == "__main__":
