@@ -81,6 +81,40 @@ def hypergraph_conductance(hypergraph, vertex_set):
         return 1
 
 
+def hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r):
+    """
+    Given a hypergraph H and a set of vertices (L, R), compute the bipartiteness of the set L, R given by
+        beta(L, R) = [ w(L | notL) + w(R | notR) + w(L | R) + w(R | L) ] / vol(L union R)
+    :param hypergraph: the hypergraph on which to operate
+    :param vertex_set_l: the vertex set L
+    :param vertex_set_r: the vertex set R
+    :return: the bipartiteness beta(L, R)
+    """
+    vol_s = hypergraph_volume(hypergraph, vertex_set_l + vertex_set_r)
+
+    w_l_not_l = 0
+    w_r_not_r = 0
+    w_l_r = 0
+    w_r_l = 0
+    for edge in hypergraph.edges():
+        edge_intersects_l = len([v for v in edge.elements if v in vertex_set_l]) > 0
+        edge_intersects_r = len([v for v in edge.elements if v in vertex_set_r]) > 0
+        edge_entirely_inside_l = len([v for v in edge.elements if v not in vertex_set_l]) == 0
+        edge_entirely_inside_r = len([v for v in edge.elements if v not in vertex_set_r]) == 0
+
+        if edge_entirely_inside_l:
+            w_l_not_l += 1
+        if edge_entirely_inside_r:
+            w_r_not_r += 1
+        if edge_intersects_l and not edge_intersects_r:
+            w_l_r += 1
+        if edge_intersects_r and not edge_intersects_l:
+            w_r_l += 1
+
+    # Compute the bipartiteness
+    return (w_l_not_l + w_r_not_r + w_l_r + w_r_l) / vol_s
+
+
 def hypergraph_sweep_set(x, hypergraph):
     """
     Perform a sweep set procedure for a hypergraph in order to find a cut with low conductance.
