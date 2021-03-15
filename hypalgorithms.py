@@ -7,7 +7,8 @@ import hypmc
 import hypreductions
 
 
-def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_random_initialisation=False):
+def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_random_initialisation=False,
+                                 approximate=False):
     """
     Given a hypergraph, use the diffusion process to find an almost bipartite set.
     :param hypergraph: The hypergraph on which to find a bipartite set
@@ -15,6 +16,7 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
     :param step_size: The step size to use for the diffusion
     :param use_random_initialisation: By default, we will use the eigenvector of the clique graph to initialise. If this
                                       parameter is true, then we will use a random vector to initialise the diffusion.
+    :param approximate: Whether to use the approximate, no-LP version of the diffusion operator
     :return: the sets L, and R, and the bipartiteness value beta(L, R)
     """
     if use_random_initialisation:
@@ -34,7 +36,7 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
 
     # Compute the diffusion process until convergence
     measure_vector, _, _ = hypmc.sim_mc_heat_diff(
-        s, hypergraph, max_time=max_time, step=step_size, check_converged=True, plot_diff=True)
+        s, hypergraph, max_time=max_time, step=step_size, check_converged=True, plot_diff=True, approximate=approximate)
 
     # Perform the sweep set algorithm on the measure vector to find the almost-bipartite set
     vertex_set_l, vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(measure_vector, hypergraph)

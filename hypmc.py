@@ -5,6 +5,7 @@ import math
 import hyplap
 import hypconstruct
 import hypalgorithms
+import hypreductions
 import numpy as np
 from scipy.optimize import linprog
 import scipy as sp
@@ -275,19 +276,27 @@ def compute_mc_edge_info(f, hypergraph, debug=False):
 # ==========================================================
 # Compute the hypergraph max cut operator for a given vector
 # ==========================================================
-def weighted_mc_diffusion_gradient(f, hypergraph, debug=False):
+def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False):
     """
     Given a vector in the weighted space, compute the gradient
-         r = df/dt
+         r = df/dt = - L_H f
     according to the max cut heat diffusion procedure.
     :param f:
     :param hypergraph:
     :param debug: Whether to print debug information
+    :param approximate: Do not use the LP to compute the gradient, instead use the approximate induced graph.
     :return:
     """
     # We will round the vector f to a small(ish) precision so as to
     # avoid vertices ending in the wrong equivalence classes due to numerical errors.
     f = np.round(f, decimals=5)
+
+    # If we are computing the approximate gradient, do so and return from the function
+    if approximate:
+        approximate_induced_graph = hypreductions.hypergraph_approximate_diffusion_reduction(hypergraph, f)
+        diffusion_operator = graph_diffusion_operator(approximate_induced_graph)
+        r = - diffusion_operator @ f
+        return r
 
     # Compute some standard information about every edge in the hypergraph
     edge_info = compute_mc_edge_info(f, hypergraph)
@@ -331,7 +340,7 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False):
     return r
 
 
-def hypergraph_measure_mc_laplacian(phi, hypergraph, debug=False):
+def hypergraph_measure_mc_laplacian(phi, hypergraph, debug=False, approximate=False):
     """
     Apply the hypergraph max cut operator to a vector phi in the measure space.
     In the normal language of graphs, this operator would be written as:
@@ -339,10 +348,11 @@ def hypergraph_measure_mc_laplacian(phi, hypergraph, debug=False):
     :param phi: The vector to apply the laplacian operator to.
     :param hypergraph: The underlying hypergraph
     :param debug: Whether to print debug information
+    :param approximate: Whether to use the approximate no-LP version
     :return: L_H x
     """
     f = hyplap.measure_to_weighted(phi, hypergraph)
-    r = weighted_mc_diffusion_gradient(f, hypergraph, debug=debug)
+    r = weighted_mc_diffusion_gradient(f, hypergraph, debug=debug, approximate=approximate)
     return -hyplap.hypergraph_degree_mat(hypergraph) @ r
 
 
@@ -355,8 +365,8 @@ def graph_diffusion_operator(graph):
     adjacency_matrix = nx.to_scipy_sparse_matrix(graph, format="csr")
     n, m = adjacency_matrix.shape
     degrees = adjacency_matrix.sum(axis=1)
-    degree_matrix = sp.sparse.spdiags(degrees.flatten(), [0], m, n, format="csr")
-    inverse_degree_matrix = sp.sparse.linalg.inv(degree_matrix)
+    inverse_degrees = np.array([math.sqrt(x) if x != 0 else 0 for x in degrees])
+    inverse_degree_matrix = sp.sparse.spdiags(inverse_degrees.flatten(), [0], m, n, format="csr")
     l_operator = sp.sparse.identity(n) + adjacency_matrix @ inverse_degree_matrix
     return l_operator
 
@@ -365,7 +375,7 @@ def graph_diffusion_operator(graph):
 # Simulate the max cut heat diffusion process
 # =======================================================
 def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_diff=False,
-                     print_time=False, check_converged=False):
+                     print_time=False, check_converged=False, approximate=False):
     """
     Simulate the heat diffusion process for the hypergraph max cut operator.
     :param phi: The measure vector at the start of the process
@@ -376,6 +386,7 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
     :param plot_diff: Whether to plot graphs showing the progression of the diffusion
     :param print_time: Whether to print the time steps
     :param check_converged: Whether to check for convergence of G(t)
+    :param approximate: Whether to use the approximate no-LP version of the diffusion operator
     :return: A measure vector at the end of the process, the final time of the diffusion process, the sequence of G(T)
     """
     # If we are going to plot the diffusion process, we will show the following quantities:
@@ -397,7 +408,7 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
             print(f"Time {t:.2f}")
 
         # Apply the diffusion operator
-        grad_hyp = -hypergraph_measure_mc_laplacian(x_t, hypergraph, debug=debug)
+        grad_hyp = -hypergraph_measure_mc_laplacian(x_t, hypergraph, debug=debug, approximate=approximate)
         x_t += step * grad_hyp
 
         # Add the graph points for this time step
@@ -406,7 +417,7 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
         negative_log_ft.append(- math.log(this_ft))
         x_tn = x_t / this_ft
         this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @
-                   hypergraph_measure_mc_laplacian(x_tn, hypergraph)) / (
+                   hypergraph_measure_mc_laplacian(x_tn, hypergraph, approximate=approximate)) / (
                 x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
         g_t.append(this_gt)
         if len(g_t) > 2:
@@ -432,7 +443,7 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
     this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_t
     x_tn = x_t / this_ft
     final_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @
-                hypergraph_measure_mc_laplacian(x_tn, hypergraph)) / (
+                hypergraph_measure_mc_laplacian(x_tn, hypergraph, approximate=approximate)) / (
             x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
     if print_time:
         print(f"Final value of G(t): {final_gt:.5f}")
@@ -487,7 +498,7 @@ def check_random_2_color_graph(n, m, r, t, eps):
 
 
 def main():
-    n = 50
+    n = 10
     m = 2 * n
     r = 3
     show_hypergraph = False
@@ -516,6 +527,12 @@ def main():
     print(vertex_set_r)
     print(bipartiteness)
     print()
+    print("Diffusion - Clique - Approximate")
+    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(hypergraph, approximate=True)
+    print(vertex_set_l)
+    print(vertex_set_r)
+    print(bipartiteness)
+    print()
     print("Random")
     vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_random(hypergraph)
     print(vertex_set_l)
@@ -525,6 +542,13 @@ def main():
     print("Diffusion - Random")
     vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(
         hypergraph, use_random_initialisation=True)
+    print(vertex_set_l)
+    print(vertex_set_r)
+    print(bipartiteness)
+    print()
+    print("Diffusion - Random - Approximate")
+    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(
+        hypergraph, use_random_initialisation=True, approximate=True)
     print(vertex_set_l)
     print(vertex_set_r)
     print(bipartiteness)

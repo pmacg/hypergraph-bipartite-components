@@ -4,6 +4,7 @@ This file gives various methods for reducing a hypergraph to a simple 2-graph.
 import random
 import networkx as nx
 import hypcheeg
+import hypmc
 
 
 def hypergraph_min_edges_graph_reduction(hypergraph):
@@ -103,6 +104,49 @@ def hypergraph_clique_reduction(hypergraph):
                     new_edges[new_edge] = new_edges[new_edge] + new_weight
                 else:
                     new_edges[new_edge] = new_weight
+
+    # Unroll this dictionary into a list of 3-tuples and add the edges to the new graph
+    new_edges_list = []
+    for new_edge in new_edges:
+        new_edges_list.append((new_edge[0], new_edge[1], {'weight': new_edges[new_edge]}))
+    new_graph.add_edges_from(new_edges_list)
+
+    return new_graph
+
+
+def hypergraph_approximate_diffusion_reduction(hypergraph, x):
+    """
+    Given a hypergraph and a vector, compute the graph 'induced' by the diffusion process. This computes an approximate
+    version of the graph in which each edges weight is evenly distributed between the bipartite graph between I(e) and
+    S(e).
+    :param hypergraph: the hypergrpah on which we are operating
+    :param x: the vector which is inducing the graph
+    :return:
+    """
+    new_graph = nx.Graph()
+
+    # Add the vertices to the graph
+    for vertex in hypergraph.nodes:
+        new_graph.add_node(vertex)
+
+    # Compute the maximum and minimum sets for each edge
+    edge_info = hypmc.compute_mc_edge_info(x, hypergraph)
+
+    # Add the edges to the graph. This dictionary will use tuples (u, v) as keys and store the total weight between u
+    # and v as the value.
+    new_edges = {}
+    for this_edge_info in edge_info.values():
+        min_vertices = this_edge_info[0]
+        max_vertices = this_edge_info[1]
+        new_edge_weight = 1 / (len(min_vertices) * len(max_vertices))
+
+        for vertex_1 in min_vertices:
+            for vertex_2 in max_vertices:
+                new_edge = tuple(sorted((vertex_1, vertex_2)))
+                if new_edge in new_edges:
+                    new_edges[new_edge] = new_edges[new_edge] + new_edge_weight
+                else:
+                    new_edges[new_edge] = new_edge_weight
 
     # Unroll this dictionary into a list of 3-tuples and add the edges to the new graph
     new_edges_list = []
