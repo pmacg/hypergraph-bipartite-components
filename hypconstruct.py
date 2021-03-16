@@ -39,7 +39,6 @@ def construct_low_conductance_hypergraph(n1, n2, m, r, p1, p2):
                 hyp_dict[e] = random.sample(nodes_b, r)
 
     # Return the final hypergraph
-    print(f"Constructed hypergraph: {hyp_dict}")
     return hnx.Hypergraph(hyp_dict)
 
 
