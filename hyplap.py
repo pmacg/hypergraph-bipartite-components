@@ -10,10 +10,11 @@ import sys
 from scipy.optimize import linprog
 
 
-def hypergraph_degree_mat(hypergraph):
+def hypergraph_degree_mat(hypergraph, inverse=False):
     """
     Given a hypergraph H, compute the degree matrix containing the degree of each vertex on the diagonal.
     :param hypergraph:
+    :param inverse: If true, return the inverse of the matrix
     :return: A numpy matrix containing the degrees.
     """
     # Get the vertices from the hypergraph
@@ -23,7 +24,10 @@ def hypergraph_degree_mat(hypergraph):
     # Construct the empty matrix whose diagonal we will fill.
     degree_matrix = np.zeros((n, n))
     for vertex_index, vertex_name in enumerate(vertices):
-        degree_matrix[vertex_index, vertex_index] = hypergraph.degree(vertex_name)
+        if inverse:
+            degree_matrix[vertex_index, vertex_index] = 1 / hypergraph.degree(vertex_name)
+        else:
+            degree_matrix[vertex_index, vertex_index] = hypergraph.degree(vertex_name)
     return degree_matrix
 
 

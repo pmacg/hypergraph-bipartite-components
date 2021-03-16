@@ -294,7 +294,8 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
     # If we are computing the approximate gradient, do so and return from the function
     if approximate:
         approximate_induced_graph = hypreductions.hypergraph_approximate_diffusion_reduction(hypergraph, f)
-        diffusion_operator = graph_diffusion_operator(approximate_induced_graph)
+        diffusion_operator = hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ \
+            graph_diffusion_operator(approximate_induced_graph) @ graph_degree_matrix(approximate_induced_graph)
         r = - diffusion_operator @ f
         return r
 
@@ -356,6 +357,24 @@ def hypergraph_measure_mc_laplacian(phi, hypergraph, debug=False, approximate=Fa
     return -hyplap.hypergraph_degree_mat(hypergraph) @ r
 
 
+def graph_degree_matrix(graph, inverse=False):
+    """
+    Compute the degree matrix of a given networkx graph.
+    :param graph:
+    :param inverse: If true, return the inverse of the degree matrix.
+    :return: A scipy sparse matrix
+    """
+    adjacency_matrix = nx.to_scipy_sparse_matrix(graph, format="csr")
+    n, m = adjacency_matrix.shape
+    degrees = adjacency_matrix.sum(axis=1)
+
+    if inverse:
+        inverse_degrees = np.array([math.sqrt(x) if x != 0 else 0 for x in degrees])
+        return sp.sparse.spdiags(inverse_degrees.flatten(), [0], m, n, format="csr")
+    else:
+        return sp.sparse.spdiags(degrees.flatten(), [0], m, n, format="csr")
+
+
 def graph_diffusion_operator(graph):
     """
     Construct the operator (I + A D^{-1}) for the given graph.
@@ -364,9 +383,7 @@ def graph_diffusion_operator(graph):
     """
     adjacency_matrix = nx.to_scipy_sparse_matrix(graph, format="csr")
     n, m = adjacency_matrix.shape
-    degrees = adjacency_matrix.sum(axis=1)
-    inverse_degrees = np.array([math.sqrt(x) if x != 0 else 0 for x in degrees])
-    inverse_degree_matrix = sp.sparse.spdiags(inverse_degrees.flatten(), [0], m, n, format="csr")
+    inverse_degree_matrix = graph_degree_matrix(graph, inverse=True)
     l_operator = sp.sparse.identity(n) + adjacency_matrix @ inverse_degree_matrix
     return l_operator
 
