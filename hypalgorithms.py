@@ -36,7 +36,7 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
 
     # Compute the diffusion process until convergence
     measure_vector, _, _ = hypmc.sim_mc_heat_diff(
-        s, hypergraph, max_time=max_time, step=step_size, check_converged=True, plot_diff=True, approximate=approximate)
+        s, hypergraph, max_time=max_time, step=step_size, check_converged=True, plot_diff=False, approximate=approximate)
 
     # Perform the sweep set algorithm on the measure vector to find the almost-bipartite set
     vertex_set_l, vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(measure_vector, hypergraph)

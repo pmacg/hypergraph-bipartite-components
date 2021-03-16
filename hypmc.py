@@ -364,7 +364,8 @@ def graph_degree_matrix(graph, inverse=False):
     :param inverse: If true, return the inverse of the degree matrix.
     :return: A scipy sparse matrix
     """
-    adjacency_matrix = nx.to_scipy_sparse_matrix(graph, format="csr")
+    # adjacency_matrix = nx.to_scipy_sparse_matrix(graph, format="csr")
+    adjacency_matrix = nx.adjacency_matrix(graph)
     n, m = adjacency_matrix.shape
     degrees = adjacency_matrix.sum(axis=1)
 
@@ -429,29 +430,39 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
         if print_time:
             print(f"Time {t:.2f}")
 
-        # Apply the diffusion operator
-        grad_hyp = -hypergraph_measure_mc_laplacian(x_t, hypergraph, debug=debug, approximate=approximate)
-        x_t += step * grad_hyp
-
-        # Add the graph points for this time step
-        this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_t
-        f_t.append(this_ft)
-        negative_log_ft.append(- math.log(this_ft))
-        x_tn = x_t / this_ft
-
         # Computing G(t) - when we are approximating the diffusion process, the numerator may not be a nice, positive
         # semi-definite matrix.
         if not approximate:
+            # Apply the diffusion operator
+            grad_hyp = -hypergraph_measure_mc_laplacian(x_t, hypergraph, debug=debug, approximate=approximate)
+            x_t += step * grad_hyp
+
+            # Add the graph points for this time step
+            this_ft = x_t @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ x_t
+            f_t.append(this_ft)
+            negative_log_ft.append(- math.log(this_ft))
+            x_tn = x_t / this_ft
+
             this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @
                        hypergraph_measure_mc_laplacian(x_tn, hypergraph)) / (
                     x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
         else:
-            # Approximate the value of this_gt using the matrices of the approximate induced graph
-            f = hyplap.measure_to_weighted(x_tn, hypergraph)
+            # Apply the approximate diffusion operator
+            f = hyplap.measure_to_weighted(x_t, hypergraph)
             approximate_diffusion_graph = hypreductions.hypergraph_approximate_diffusion_reduction(hypergraph, f)
             inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
-            this_gt = (x_tn @ inverse_degree_matrix @
-                       graph_diffusion_operator(approximate_diffusion_graph, normalised=False) @
+            diff_operator = graph_diffusion_operator(approximate_diffusion_graph, normalised=False)
+            grad_hyp = - diff_operator @ f
+            x_t += step * grad_hyp
+
+            # Add the graph points for this time step
+            this_ft = x_t @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ x_t
+            f_t.append(this_ft)
+            negative_log_ft.append(- math.log(this_ft))
+            x_tn = x_t / this_ft
+
+            # Approximate the value of this_gt using the matrices of the approximate induced graph
+            this_gt = (x_tn @ inverse_degree_matrix @ diff_operator @
                        inverse_degree_matrix @ x_tn) / (x_tn @ inverse_degree_matrix @ x_tn)
         g_t.append(this_gt)
         if len(g_t) > 2:
@@ -532,7 +543,7 @@ def check_random_2_color_graph(n, m, r, t, eps):
 
 
 def main():
-    n = 10
+    n = 500
     m = 2 * n
     r = 3
     show_hypergraph = False
@@ -563,7 +574,7 @@ def main():
     # print()
     print("Diffusion - Clique - Approximate")
     vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(hypergraph,
-                                                                                           step_size=0.01,
+                                                                                           step_size=0.1,
                                                                                            approximate=True)
     print(vertex_set_l)
     print(vertex_set_r)
