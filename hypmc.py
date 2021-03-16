@@ -295,7 +295,7 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
     if approximate:
         approximate_induced_graph = hypreductions.hypergraph_approximate_diffusion_reduction(hypergraph, f)
         diffusion_operator = hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ \
-            graph_diffusion_operator(approximate_induced_graph) @ graph_degree_matrix(approximate_induced_graph)
+            graph_diffusion_operator(approximate_induced_graph, normalised=False)
         r = - diffusion_operator @ f
         return r
 
@@ -369,23 +369,28 @@ def graph_degree_matrix(graph, inverse=False):
     degrees = adjacency_matrix.sum(axis=1)
 
     if inverse:
-        inverse_degrees = np.array([math.sqrt(x) if x != 0 else 0 for x in degrees])
+        inverse_degrees = np.array([1/x if x != 0 else 0 for x in degrees])
         return sp.sparse.spdiags(inverse_degrees.flatten(), [0], m, n, format="csr")
     else:
         return sp.sparse.spdiags(degrees.flatten(), [0], m, n, format="csr")
 
 
-def graph_diffusion_operator(graph):
+def graph_diffusion_operator(graph, normalised=True):
     """
-    Construct the operator (I + A D^{-1}) for the given graph.
+    Construct the operator (I + A D^{-1}) for the given graph. This is the diffusion operator on the measure space.
     :param graph: A networkx graph
+    :param normalised: If False, return instead the matrix (D + A)
     :return: a scipy matrix
     """
     adjacency_matrix = nx.to_scipy_sparse_matrix(graph, format="csr")
     n, m = adjacency_matrix.shape
-    inverse_degree_matrix = graph_degree_matrix(graph, inverse=True)
-    l_operator = sp.sparse.identity(n) + adjacency_matrix @ inverse_degree_matrix
-    return l_operator
+
+    if not normalised:
+        degree_matrix = graph_degree_matrix(graph)
+        return degree_matrix + adjacency_matrix
+    else:
+        inverse_degree_matrix = graph_degree_matrix(graph, inverse=True)
+        return sp.sparse.identity(n) + adjacency_matrix @ inverse_degree_matrix
 
 
 # =======================================================
@@ -433,9 +438,21 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
         f_t.append(this_ft)
         negative_log_ft.append(- math.log(this_ft))
         x_tn = x_t / this_ft
-        this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @
-                   hypergraph_measure_mc_laplacian(x_tn, hypergraph, approximate=approximate)) / (
-                x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
+
+        # Computing G(t) - when we are approximating the diffusion process, the numerator may not be a nice, positive
+        # semi-definite matrix.
+        if not approximate:
+            this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @
+                       hypergraph_measure_mc_laplacian(x_tn, hypergraph)) / (
+                    x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
+        else:
+            # Approximate the value of this_gt using the matrices of the approximate induced graph
+            f = hyplap.measure_to_weighted(x_tn, hypergraph)
+            approximate_diffusion_graph = hypreductions.hypergraph_approximate_diffusion_reduction(hypergraph, f)
+            inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
+            this_gt = (x_tn @ inverse_degree_matrix @
+                       graph_diffusion_operator(approximate_diffusion_graph, normalised=False) @
+                       inverse_degree_matrix @ x_tn) / (x_tn @ inverse_degree_matrix @ x_tn)
         g_t.append(this_gt)
         if len(g_t) > 2:
             h_t.append((g_t[-2] - g_t[-1]) / step)
@@ -538,37 +555,39 @@ def main():
     print(vertex_set_r)
     print(bipartiteness)
     print()
-    print("Diffusion - Clique")
-    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(hypergraph)
-    print(vertex_set_l)
-    print(vertex_set_r)
-    print(bipartiteness)
-    print()
+    # print("Diffusion - Clique")
+    # vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(hypergraph)
+    # print(vertex_set_l)
+    # print(vertex_set_r)
+    # print(bipartiteness)
+    # print()
     print("Diffusion - Clique - Approximate")
-    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(hypergraph, approximate=True)
+    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(hypergraph,
+                                                                                           step_size=0.01,
+                                                                                           approximate=True)
     print(vertex_set_l)
     print(vertex_set_r)
     print(bipartiteness)
     print()
-    print("Random")
-    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_random(hypergraph)
-    print(vertex_set_l)
-    print(vertex_set_r)
-    print(bipartiteness)
-    print()
-    print("Diffusion - Random")
-    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(
-        hypergraph, use_random_initialisation=True)
-    print(vertex_set_l)
-    print(vertex_set_r)
-    print(bipartiteness)
-    print()
-    print("Diffusion - Random - Approximate")
-    vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(
-        hypergraph, use_random_initialisation=True, approximate=True)
-    print(vertex_set_l)
-    print(vertex_set_r)
-    print(bipartiteness)
+    # print("Random")
+    # vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_random(hypergraph)
+    # print(vertex_set_l)
+    # print(vertex_set_r)
+    # print(bipartiteness)
+    # print()
+    # print("Diffusion - Random")
+    # vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(
+    #     hypergraph, use_random_initialisation=True)
+    # print(vertex_set_l)
+    # print(vertex_set_r)
+    # print(bipartiteness)
+    # print()
+    # print("Diffusion - Random - Approximate")
+    # vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(
+    #     hypergraph, use_random_initialisation=True, approximate=True)
+    # print(vertex_set_l)
+    # print(vertex_set_r)
+    # print(bipartiteness)
 
 
 if __name__ == "__main__":
