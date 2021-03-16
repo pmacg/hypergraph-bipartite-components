@@ -119,7 +119,7 @@ def hypergraph_approximate_diffusion_reduction(hypergraph, x):
     Given a hypergraph and a vector, compute the graph 'induced' by the diffusion process. This computes an approximate
     version of the graph in which each edges weight is evenly distributed between the bipartite graph between I(e) and
     S(e).
-    :param hypergraph: the hypergrpah on which we are operating
+    :param hypergraph: the hypergraph on which we are operating
     :param x: the vector which is inducing the graph
     :return:
     """
