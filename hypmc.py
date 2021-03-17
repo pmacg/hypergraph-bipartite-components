@@ -4,13 +4,11 @@ This file contains code for computing the hypergraph max-cut laplacian operator.
 import math
 import hyplap
 import hypconstruct
-import hypalgorithms
 import hypreductions
 import numpy as np
 from scipy.optimize import linprog
 import scipy as sp
 import scipy.sparse.linalg
-import hypernetx as hnx
 import networkx as nx
 import matplotlib.pyplot as plt
 
