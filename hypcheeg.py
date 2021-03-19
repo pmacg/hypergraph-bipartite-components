@@ -150,12 +150,23 @@ def hypergraph_two_sided_sweep(x, hypergraph):
     :param hypergraph: The underlying hypergraph, as a hypernetx object
     :return: L, R - the pair of sets with the smallest bipartiteness found by sweeping over the vector x
     """
+    # Get useful data about the hypergraph that we will use repeatedly in the algorithm
     all_vertices = [v.uid for v in hypergraph.nodes()]
-    best_l = []
-    best_r = []
+    all_edges = hypergraph.edges()
+    dict_vertices_to_adjacent_edges = {v: [] for v in all_vertices}
+    for edge in all_edges:
+        for vertex in edge:
+            dict_vertices_to_adjacent_edges[vertex].append(edge)
+
+    best_l = set()
+    best_r = set()
     best_bipartiteness = 1
-    current_l = []
-    current_r = []
+    current_l = set()
+    current_r = set()
+
+    # We will update the computation of the bipartiteness as we go along.
+    current_vol = 0
+    current_numerator = 0
 
     # Get the sorted indices of x, in order of highest absolute value to lowest
     ordering = reversed(np.argsort(abs(x)))
@@ -163,19 +174,50 @@ def hypergraph_two_sided_sweep(x, hypergraph):
     # Perform the sweep
     for vertex_index in ordering:
         # Add the next vertex to the candidate set
+        added_to_l = False
         if x[vertex_index] >= 0:
-            current_r.append(all_vertices[vertex_index])
+            current_r.add(all_vertices[vertex_index])
         else:
-            current_l.append(all_vertices[vertex_index])
+            added_to_l = True
+            current_l.add(all_vertices[vertex_index])
+
+        # Update the bipartiteness values
+        current_vol += hypergraph.degree(all_vertices[vertex_index])
+        for edge in dict_vertices_to_adjacent_edges[all_vertices[vertex_index]]:
+            edge_l_intersection = len([v for v in edge.elements if v in current_l])
+            edge_r_intersection = len([v for v in edge.elements if v in current_r])
+            edge_entirely_inside_l = len([v for v in edge.elements if v not in current_l]) == 0
+            edge_entirely_inside_r = len([v for v in edge.elements if v not in current_r]) == 0
+
+            if edge_entirely_inside_l:
+                current_numerator += 1
+            if edge_entirely_inside_r:
+                current_numerator += 1
+            if edge_l_intersection > 0 and edge_r_intersection == 0:
+                current_numerator += 1
+            if edge_r_intersection > 0 and edge_l_intersection == 0:
+                current_numerator += 1
+
+            # Remove 1 from the numerator if we were already counting one.
+            if added_to_l:
+                if edge_l_intersection >= 2 and edge_r_intersection == 0:
+                    current_numerator -= 1
+                if edge_l_intersection == 1 and edge_r_intersection > 0:
+                    current_numerator -= 1
+            else:
+                if edge_r_intersection >= 2 and edge_l_intersection == 0:
+                    current_numerator -= 1
+                if edge_r_intersection == 1 and edge_l_intersection > 0:
+                    current_numerator -= 1
 
         # Get the bipartiteness and check if it is best so far
-        beta = hypergraph_bipartiteness(hypergraph, current_l, current_r)
+        beta = current_numerator / current_vol
         if beta < best_bipartiteness:
             best_bipartiteness = beta
-            best_l = list(np.copy(current_l))
-            best_r = list(np.copy(current_r))
+            best_l = current_l.copy()
+            best_r = current_r.copy()
 
-    return best_l, best_r
+    return list(best_l), list(best_r)
 
 
 def hypergraph_common_edges(u, v, hypergraph):
