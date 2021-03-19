@@ -7,6 +7,28 @@ import hypmc
 import hypreductions
 
 
+def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_size, approximate):
+    """
+    Internal method for running the bipartite diffusion algorithm.
+    :param starting_vector: the starting vector of the diffusion process
+    :param hypergraph: the hypergraph on which to run
+    :param max_time: the maximum diffusion time
+    :param step_size: the step size for the diffusion
+    :param approximate: whether to run the approximate version of the diffusion process
+    :return: the sets L and R, and their bipartiteness
+    """
+    # Compute the diffusion process until convergence
+    measure_vector, _, _ = hypmc.sim_mc_heat_diff(
+        starting_vector, hypergraph, max_time=max_time, step=step_size, check_converged=True, plot_diff=False,
+        approximate=approximate)
+
+    # Perform the sweep set algorithm on the measure vector to find the almost-bipartite set
+    vertex_set_l, vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(measure_vector, hypergraph)
+    beta = hypcheeg.hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r)
+
+    return vertex_set_l, vertex_set_r, beta
+
+
 def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_random_initialisation=False,
                                  approximate=False):
     """
@@ -20,9 +42,28 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
     :return: the sets L, and R, and the bipartiteness value beta(L, R)
     """
     if use_random_initialisation:
-        # Compute a random starting vector for the diffusion process
+        # We will run the diffusion process 5 times, starting from a different random starting vector each time.
+        best_bipartiteness = 1
+        best_vertex_set_l = []
+        best_vertex_set_r = []
+
         n = hypergraph.number_of_nodes()
-        s = 2 * (np.random.randint(2, size=n) - 1/2)
+        for i in range(5):
+            # Compute a random starting vector for the diffusion process
+            s = 2 * (np.random.randint(2, size=n) - 1/2)
+
+            # Run the diffusion process
+            this_vertex_set_l, this_vertex_set_r, this_bipartiteness = _internal_bipartite_diffusion(
+                s, hypergraph, max_time, step_size, approximate)
+
+            # Check if this is the best one so far
+            if this_bipartiteness < best_bipartiteness:
+                best_bipartiteness = this_bipartiteness
+                best_vertex_set_l = this_vertex_set_l
+                best_vertex_set_r = this_vertex_set_r
+
+        # Return the best set
+        return best_vertex_set_l, best_vertex_set_r, best_bipartiteness
     else:
         # Construct the clique graph from the hypergraph
         weighted_clique_graph = hypreductions.hypergraph_clique_reduction(hypergraph)
@@ -34,16 +75,7 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
         eigenvalues, eigenvectors = sp.sparse.linalg.eigsh(l_clique, k=1, which='SM')
         s = eigenvectors[:, 0]
 
-    # Compute the diffusion process until convergence
-    measure_vector, _, _ = hypmc.sim_mc_heat_diff(
-        s, hypergraph, max_time=max_time, step=step_size, check_converged=True, plot_diff=False,
-        approximate=approximate)
-
-    # Perform the sweep set algorithm on the measure vector to find the almost-bipartite set
-    vertex_set_l, vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(measure_vector, hypergraph)
-    beta = hypcheeg.hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r)
-
-    return vertex_set_l, vertex_set_r, beta
+        return _internal_bipartite_diffusion(s, hypergraph, max_time, step_size, approximate)
 
 
 def find_bipartite_set_clique(hypergraph):
@@ -75,12 +107,25 @@ def find_bipartite_set_random(hypergraph):
     :param hypergraph:
     :return: the sets L and R, and the bipartiteness value beta(L, R)
     """
-    # Compute a random +/- 1 vector
+    # We will run the algorithm 5 times, and return the best result
+    best_bipartiteness = 1
+    best_vertex_set_l = []
+    best_vertex_set_r = []
+
     n = hypergraph.number_of_nodes()
-    x = 2 * (np.random.randint(2, size=n) - 1 / 2)
+    for i in range(5):
+        # Compute a random starting vector for the diffusion process
+        s = 2 * (np.random.randint(2, size=n) - 1 / 2)
 
-    # Perform the sweep-set procedure on this vector
-    vertex_set_l, vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(x, hypergraph)
-    beta = hypcheeg.hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r)
+        # Perform the sweep-set procedure on this vector
+        this_vertex_set_l, this_vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(s, hypergraph)
+        this_bipartiteness = hypcheeg.hypergraph_bipartiteness(hypergraph, this_vertex_set_l, this_vertex_set_r)
 
-    return vertex_set_l, vertex_set_r, beta
+        # Check if this is the best one so far
+        if this_bipartiteness < best_bipartiteness:
+            best_bipartiteness = this_bipartiteness
+            best_vertex_set_l = this_vertex_set_l
+            best_vertex_set_r = this_vertex_set_r
+
+    # Return the best set
+    return best_vertex_set_l, best_vertex_set_r, best_bipartiteness
