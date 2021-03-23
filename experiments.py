@@ -141,6 +141,7 @@ def dataset_experiment():
     clique_alg_l, clique_alg_r, clique_bipart = hypalgorithms.find_bipartite_set_clique(senate_dataset.hypergraph)
     print([senate_dataset.gt_clusters[x] for x in clique_alg_l])
     print(sum([senate_dataset.gt_clusters[x] for x in clique_alg_l]) / len(clique_alg_l))
+    print(clique_bipart)
 
     # Run the diffusion algorithm
     diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(senate_dataset.hypergraph,
@@ -148,6 +149,7 @@ def dataset_experiment():
                                                                                      approximate=True)
     print([senate_dataset.gt_clusters[x] for x in diff_alg_l])
     print(sum([senate_dataset.gt_clusters[x] for x in diff_alg_l]) / len(diff_alg_l))
+    print(diff_bipart)
 
 
 if __name__ == "__main__":
