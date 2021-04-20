@@ -33,8 +33,9 @@ class LightHypergraph(object):
             for vertex in edge:
                 self.degrees[vertex] += 1
 
-        self.inv_degrees = list(map(lambda x: 1 / x, self.degrees))
+        self.inv_degrees = list(map(lambda x: 1 / x if x > 0 else 0, self.degrees))
         self.sqrt_degrees = list(map(math.sqrt, self.degrees))
+        self.inv_sqrt_degrees = list(map(lambda x: 1 / x if x > 0 else 0, self.sqrt_degrees))
 
     def degree(self, vertex):
         return self.degrees[vertex]
@@ -53,7 +54,7 @@ class LightGraph(object):
         """Initialise the graph with an adjacency matrix. This should be a sparse scipy matrix."""
         self.adj_mat = adj_mat
 
-        self.degrees = sum(adj_mat).todense().tolist()[0]
+        self.degrees = adj_mat.sum(axis=0).tolist()[0]
         self.inv_degrees = list(map(lambda x: 1 / x if x != 0 else 0, self.degrees))
         self.sqrt_degrees = list(map(math.sqrt, self.degrees))
 

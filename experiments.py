@@ -152,4 +152,8 @@ if __name__ == "__main__":
     imdb_dataset = datasets.ImdbDataset()
 
     print("Running algorithms...")
-    dataset_experiment(imdb_dataset)
+    diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(imdb_dataset.hypergraph,
+                                                                                     step_size=1,
+                                                                                     approximate=True,
+                                                                                     use_random_initialisation=True)
+    print(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")

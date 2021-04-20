@@ -5,30 +5,34 @@ The terminology used in this file comes from the following paper: https://arxiv.
 import networkx as nx
 import hypernetx as hnx
 import numpy as np
+import scipy as sp
+import scipy.sparse.linalg
 import matplotlib.pyplot as plt
 import sys
+import math
 from scipy.optimize import linprog
 
 
-def hypergraph_degree_mat(hypergraph, inverse=False):
+def hypergraph_degree_mat(hypergraph, inverse=False, sqrt=False):
     """
     Given a hypergraph H, compute the degree matrix containing the degree of each vertex on the diagonal.
     :param hypergraph:
     :param inverse: If true, return the inverse of the matrix
+    :param sqrt: If true, return the sqrt of the matrix
     :return: A numpy matrix containing the degrees.
     """
     # Get the vertices from the hypergraph
     vertices = hypergraph.nodes
     n = len(vertices)
 
-    # Construct the empty matrix whose diagonal we will fill.
-    degree_matrix = np.zeros((n, n))
-    for vertex_index, vertex_name in enumerate(vertices):
-        if inverse:
-            degree_matrix[vertex_index, vertex_index] = 1 / hypergraph.degree(vertex_name)
-        else:
-            degree_matrix[vertex_index, vertex_index] = hypergraph.degree(vertex_name)
-    return degree_matrix
+    if not inverse and not sqrt:
+        return sp.sparse.spdiags(hypergraph.degrees, 0, n, n, format="csr")
+    if inverse and not sqrt:
+        return sp.sparse.spdiags(hypergraph.inv_degrees, 0, n, n, format="csr")
+    if sqrt and not inverse:
+        return sp.sparse.spdiags(hypergraph.sqrt_degrees, 0, n, n, format="csr")
+    if inverse and sqrt:
+        return sp.sparse.spdiags(hypergraph.inv_sqrt_degrees, 0, n, n, format="csr")
 
 
 # =======================================================
@@ -42,15 +46,15 @@ def measure_to_weighted(phi, hypergraph):
     :param hypergraph: The underlying hypergraph.
     :return: The vector f in the weighted space.
     """
-    return np.linalg.pinv(hypergraph_degree_mat(hypergraph)) @ phi
+    return hypergraph_degree_mat(hypergraph, inverse=True) @ phi
 
 
 def weighted_to_normalized(f, hypergraph):
-    return np.sqrt(hypergraph_degree_mat(hypergraph)) @ f
+    return hypergraph_degree_mat(hypergraph, sqrt=True) @ f
 
 
 def normalized_to_measure(x, hypergraph):
-    return np.sqrt(hypergraph_degree_mat(hypergraph)) @ x
+    return hypergraph_degree_mat(hypergraph, sqrt=True) @ x
 
 
 def measure_to_normalized(phi, hypergraph):
