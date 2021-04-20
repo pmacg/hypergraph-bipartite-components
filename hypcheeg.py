@@ -96,11 +96,11 @@ def hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r):
     w_r_not_r = 0
     w_l_r = 0
     w_r_l = 0
-    for edge in hypergraph.edges():
-        edge_intersects_l = len([v for v in edge.elements if v in vertex_set_l]) > 0
-        edge_intersects_r = len([v for v in edge.elements if v in vertex_set_r]) > 0
-        edge_entirely_inside_l = len([v for v in edge.elements if v not in vertex_set_l]) == 0
-        edge_entirely_inside_r = len([v for v in edge.elements if v not in vertex_set_r]) == 0
+    for edge in hypergraph.edges:
+        edge_intersects_l = len([v for v in edge if v in vertex_set_l]) > 0
+        edge_intersects_r = len([v for v in edge if v in vertex_set_r]) > 0
+        edge_entirely_inside_l = len([v for v in edge if v not in vertex_set_l]) == 0
+        edge_entirely_inside_r = len([v for v in edge if v not in vertex_set_r]) == 0
 
         if edge_entirely_inside_l:
             w_l_not_l += 1
@@ -151,8 +151,8 @@ def hypergraph_two_sided_sweep(x, hypergraph):
     :return: L, R - the pair of sets with the smallest bipartiteness found by sweeping over the vector x
     """
     # Get useful data about the hypergraph that we will use repeatedly in the algorithm
-    all_vertices = [v.uid for v in hypergraph.nodes()]
-    all_edges = hypergraph.edges()
+    all_vertices = hypergraph.nodes
+    all_edges = hypergraph.edges
     dict_vertices_to_adjacent_edges = {v: [] for v in all_vertices}
     for edge in all_edges:
         for vertex in edge:
@@ -184,10 +184,10 @@ def hypergraph_two_sided_sweep(x, hypergraph):
         # Update the bipartiteness values
         current_vol += hypergraph.degree(all_vertices[vertex_index])
         for edge in dict_vertices_to_adjacent_edges[all_vertices[vertex_index]]:
-            edge_l_intersection = len([v for v in edge.elements if v in current_l])
-            edge_r_intersection = len([v for v in edge.elements if v in current_r])
-            edge_entirely_inside_l = len([v for v in edge.elements if v not in current_l]) == 0
-            edge_entirely_inside_r = len([v for v in edge.elements if v not in current_r]) == 0
+            edge_l_intersection = len([v for v in edge if v in current_l])
+            edge_r_intersection = len([v for v in edge if v in current_r])
+            edge_entirely_inside_l = len([v for v in edge if v not in current_l]) == 0
+            edge_entirely_inside_r = len([v for v in edge if v not in current_r]) == 0
 
             if edge_entirely_inside_l:
                 current_numerator += 1

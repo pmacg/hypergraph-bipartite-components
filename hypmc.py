@@ -230,7 +230,7 @@ def compute_mc_edge_info(f, hypergraph, debug=False):
     if debug:
         print('vertex_name_to_index', vertex_name_to_index)
 
-    for e in hypergraph.edges():
+    for edge_idx, e in enumerate(hypergraph.edges):
         if debug:
             print("Processing edge:", e)
         # Compute the maximum and minimum sets for the edge.
@@ -238,7 +238,7 @@ def compute_mc_edge_info(f, hypergraph, debug=False):
         min_e = max_f
         max_vertices = []
         max_e = min_f
-        for v in e.elements:
+        for v in e:
             if debug:
                 print("Considering vertex:", v)
             fv = f[vertex_name_to_index[v]]
@@ -265,7 +265,7 @@ def compute_mc_edge_info(f, hypergraph, debug=False):
                 max_vertices.append(v)
             if debug:
                 print("Ie", min_vertices, "Se", max_vertices)
-        edge_info[e.uid] = (min_vertices, max_vertices, max_e + min_e, e.elements)
+        edge_info[edge_idx] = (min_vertices, max_vertices, max_e + min_e, e)
     if debug:
         print("Returning:", edge_info)
     return edge_info
@@ -377,18 +377,18 @@ def graph_degree_matrix(graph, inverse=False):
 def graph_diffusion_operator(graph, normalised=True):
     """
     Construct the operator (I + A D^{-1}) for the given graph. This is the diffusion operator on the measure space.
-    :param graph: A networkx graph
+    :param graph: A lightgraph object
     :param normalised: If False, return instead the matrix (D + A)
     :return: a scipy matrix
     """
-    adjacency_matrix = nx.to_scipy_sparse_matrix(graph, format="csr")
+    adjacency_matrix = graph.adj_mat
     n, m = adjacency_matrix.shape
 
     if not normalised:
-        degree_matrix = graph_degree_matrix(graph)
+        degree_matrix = graph.degree_matrix()
         return degree_matrix + adjacency_matrix
     else:
-        inverse_degree_matrix = graph_degree_matrix(graph, inverse=True)
+        inverse_degree_matrix = graph.inverse_degree_matrix()
         return sp.sparse.identity(n) + adjacency_matrix @ inverse_degree_matrix
 
 

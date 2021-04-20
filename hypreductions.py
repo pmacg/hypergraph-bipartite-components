@@ -3,8 +3,11 @@ This file gives various methods for reducing a hypergraph to a simple 2-graph.
 """
 import random
 import networkx as nx
+import scipy as sp
+import scipy.sparse
 import hypcheeg
 import hypmc
+import lightgraphs
 
 
 def hypergraph_min_edges_graph_reduction(hypergraph):
@@ -79,62 +82,40 @@ def hypergraph_degree_graph_reduction(hypergraph, c=1):
 
 def hypergraph_clique_reduction(hypergraph):
     """
-    Given a hypergraph, H, return the networkx graph corresponding to the clique graph of H.
+    Given a light hypergraph, H, return a light graph corresponding to the clique graph of H.
     The clique graph is constructed by replacing each hyperedge e with a clique with edges of weight 1/(r(e) - 1).
     :param hypergraph:
-    :return: A networkx graph G
+    :return: A LightGraph G
     """
-    new_graph = nx.Graph()
+    adj_mat = sp.sparse.lil_matrix((hypergraph.num_vertices, hypergraph.num_vertices))
 
-    # Add the vertices to the graph
-    for vertex in hypergraph.nodes:
-        new_graph.add_node(vertex)
-
-    # Add the edges to the graph. This dictionary will use tuples (u, v) as keys and store the total weight between u
-    # and v as the value.
-    new_edges = {}
-    for edge in hypergraph.edges():
-        edge_vertices = [vertex for vertex in edge]
-        rank = len(edge_vertices)
+    # Add the edges to the graph.
+    for edge in hypergraph.edges:
+        rank = len(edge)
+        new_weight = 1 / (rank - 1) if rank > 1 else 0
         for vertex_index_1 in range(rank):
-            for vertex_index_2 in range(vertex_index_1 + 1, rank):
-                new_edge = (edge_vertices[vertex_index_1], edge_vertices[vertex_index_2])
-                new_weight = 1 / (rank - 1)
-                if new_edge in new_edges:
-                    new_edges[new_edge] = new_edges[new_edge] + new_weight
-                else:
-                    new_edges[new_edge] = new_weight
+            for vertex_index_2 in range(vertex_index_1, rank):
+                adj_mat[edge[vertex_index_1], edge[vertex_index_2]] += new_weight
+                adj_mat[edge[vertex_index_2], edge[vertex_index_2]] += new_weight
 
-    # Unroll this dictionary into a list of 3-tuples and add the edges to the new graph
-    new_edges_list = []
-    for new_edge in new_edges:
-        new_edges_list.append((new_edge[0], new_edge[1], {'weight': new_edges[new_edge]}))
-    new_graph.add_edges_from(new_edges_list)
-
-    return new_graph
+    return lightgraphs.LightGraph(adj_mat.tocsr())
 
 
 def hypergraph_approximate_diffusion_reduction(hypergraph, x):
     """
-    Given a hypergraph and a vector, compute the graph 'induced' by the diffusion process. This computes an approximate
-    version of the graph in which each edges weight is evenly distributed between the bipartite graph between I(e) and
-    S(e).
+    Given a light hypergraph and a vector, compute the light graph 'induced' by the diffusion process.
+    This computes an approximate version of the graph in which each edges weight is evenly distributed between
+    the bipartite graph between I(e) and S(e).
     :param hypergraph: the hypergraph on which we are operating
     :param x: the vector which is inducing the graph
-    :return:
+    :return: a light graph object
     """
-    new_graph = nx.Graph()
-
-    # Add the vertices to the graph
-    for vertex in hypergraph.nodes:
-        new_graph.add_node(vertex)
+    adj_mat = sp.sparse.lil_matrix((hypergraph.num_vertices, hypergraph.num_vertices))
 
     # Compute the maximum and minimum sets for each edge
     edge_info = hypmc.compute_mc_edge_info(x, hypergraph)
 
-    # Add the edges to the graph. This dictionary will use tuples (u, v) as keys and store the total weight between u
-    # and v as the value.
-    new_edges = {}
+    # Add the edges to the graph.
     for this_edge_info in edge_info.values():
         min_vertices = this_edge_info[0]
         max_vertices = this_edge_info[1]
@@ -142,16 +123,7 @@ def hypergraph_approximate_diffusion_reduction(hypergraph, x):
 
         for vertex_1 in min_vertices:
             for vertex_2 in max_vertices:
-                new_edge = tuple(sorted((vertex_1, vertex_2)))
-                if new_edge in new_edges:
-                    new_edges[new_edge] = new_edges[new_edge] + new_edge_weight
-                else:
-                    new_edges[new_edge] = new_edge_weight
+                adj_mat[vertex_1, vertex_2] += new_edge_weight
+                adj_mat[vertex_2, vertex_2] += new_edge_weight
 
-    # Unroll this dictionary into a list of 3-tuples and add the edges to the new graph
-    new_edges_list = []
-    for new_edge in new_edges:
-        new_edges_list.append((new_edge[0], new_edge[1], {'weight': new_edges[new_edge]}))
-    new_graph.add_edges_from(new_edges_list)
-
-    return new_graph
+    return lightgraphs.LightGraph(adj_mat.tocsr())
