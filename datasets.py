@@ -93,7 +93,8 @@ class Dataset(object):
 
         # Load the ground truth clusters and all labels
         offset = 0 if clusters_zero_indexed else -1
-        self.gt_clusters = [int(x) + offset for x in self.load_list_from_file(clusters)]
+        self.gt_clusters = [(int(x) + offset if int(x) + offset >= 0 else None)
+                            for x in self.load_list_from_file(clusters)]
         self.cluster_labels = self.load_list_from_file(cluster_labels)
         self.vertex_labels = self.load_list_from_file(vertex_labels)
         self.edge_labels = self.load_list_from_file(edge_labels)
@@ -131,4 +132,18 @@ class ImdbDataset(Dataset):
                                       None,
                                       None,
                                       vertex_zero_indexed=False)
+        self.is_loaded = True
+
+
+class FoodWebDataset(Dataset):
+    """The foodweb dataset."""
+
+    def load_data(self):
+        self.load_edgelist_and_labels("data/foodweb/foodweb_hypergraph.edgelist",
+                                      "data/foodweb/foodweb.vertices",
+                                      None,
+                                      "data/foodweb/foodweb.gt",
+                                      "data/foodweb/foodweb.clusters",
+                                      vertex_zero_indexed=False,
+                                      clusters_zero_indexed=False)
         self.is_loaded = True
