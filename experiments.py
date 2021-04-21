@@ -131,25 +131,19 @@ def test_step_sizes():
                             f_out.flush()
 
 
-def dataset_experiment():
+def dataset_experiment(dataset):
     """
     Run a test of our algorithm on a given dataset.
     """
-    senate_dataset = datasets.CongressCommitteesDataset()
-
     # Run the clique algorithm
-    clique_alg_l, clique_alg_r, clique_bipart = hypalgorithms.find_bipartite_set_clique(senate_dataset.hypergraph)
-    print([senate_dataset.gt_clusters[x] for x in clique_alg_l])
-    print(sum([senate_dataset.gt_clusters[x] for x in clique_alg_l]) / len(clique_alg_l))
-    print(clique_bipart)
+    clique_alg_l, clique_alg_r, clique_bipart = hypalgorithms.find_bipartite_set_clique(dataset.hypergraph)
+    print("Clique bipartiteness:", clique_bipart)
 
     # Run the diffusion algorithm
-    diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(senate_dataset.hypergraph,
+    diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(dataset.hypergraph,
                                                                                      step_size=1,
                                                                                      approximate=True)
-    print([senate_dataset.gt_clusters[x] for x in diff_alg_l])
-    print(sum([senate_dataset.gt_clusters[x] for x in diff_alg_l]) / len(diff_alg_l))
-    print(diff_bipart)
+    print("Diffusion bipartiteness:", diff_bipart)
 
 
 if __name__ == "__main__":
