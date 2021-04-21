@@ -153,4 +153,10 @@ def dataset_experiment():
 
 
 if __name__ == "__main__":
-    dataset_experiment()
+    print("Loading dataset...")
+    # congress_dataset = datasets.CongressCommitteesDataset()
+    # imdb_dataset = datasets.ImdbDataset()
+    foodweb_dataset = datasets.FoodWebDataset()
+
+    print("Running algorithms...")
+    dataset_experiment(foodweb_dataset)

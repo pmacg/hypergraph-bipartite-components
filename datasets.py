@@ -62,6 +62,38 @@ class Dataset(object):
                 new_list.append(line.strip())
         return new_list
 
+    def load_edgelist_and_labels(self, edgelist, vertex_labels, edge_labels, clusters, cluster_labels,
+                                 vertex_zero_indexed=True, clusters_zero_indexed=True):
+        """
+        Load the hypergraph from the given files.
+          - edgelist should have one hypergraph edge per line, with a list of vertices in the edge
+          - vertex_labels: one label per line
+          - edge_labels: one label per line, corresponding to the edgelist file
+          - clusters: a cluster index per line, corresponding to vertex_labels
+          - cluster_labels: a cluster label per line
+
+        :param edgelist:
+        :param vertex_labels:
+        :param edge_labels:
+        :param clusters:
+        :param cluster_labels:
+        :param vertex_zero_indexed:
+        :param clusters_zero_indexed:
+        :return:
+        """
+        # Start by constructing the hnx hypergraph object
+        self.hypergraph = self.load_hypergraph_from_edgelist(edgelist, zero_indexed=vertex_zero_indexed)
+        self.num_vertices = self.hypergraph.number_of_nodes()
+        self.num_edges = self.hypergraph.number_of_edges()
+
+        # Load the ground truth clusters and all labels
+        offset = 0 if clusters_zero_indexed else -1
+        self.gt_clusters = [(int(x) + offset if int(x) + offset >= 0 else None)
+                            for x in self.load_list_from_file(clusters)]
+        self.cluster_labels = self.load_list_from_file(cluster_labels)
+        self.vertex_labels = self.load_list_from_file(vertex_labels)
+        self.edge_labels = self.load_list_from_file(edge_labels)
+
     def load_data(self):
         """
         Load the dataset.
@@ -87,4 +119,18 @@ class CongressCommitteesDataset(Dataset):
         self.cluster_labels = self.load_list_from_file("data/senate-committees/label-names-senate-committees.txt")
         self.vertex_labels = self.load_list_from_file("data/senate-committees/node-names-senate-committees.txt")
 
+        self.is_loaded = True
+
+
+class FoodWebDataset(Dataset):
+    """The foodweb dataset."""
+
+    def load_data(self):
+        self.load_edgelist_and_labels("data/foodweb/foodweb_hypergraph.edgelist",
+                                      "data/foodweb/foodweb.vertices",
+                                      None,
+                                      "data/foodweb/foodweb.gt",
+                                      "data/foodweb/foodweb.clusters",
+                                      vertex_zero_indexed=False,
+                                      clusters_zero_indexed=False)
         self.is_loaded = True
