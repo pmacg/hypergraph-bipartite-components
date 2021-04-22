@@ -131,5 +131,7 @@ dmypy.json
 # PyCharm
 .idea/
 
-# Ignore data directory
+# Ignore data directory and log files
 **/data/
+hyplap.log
+

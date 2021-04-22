@@ -96,7 +96,7 @@ def hypergraph_clique_reduction(hypergraph):
         for vertex_index_1 in range(rank):
             for vertex_index_2 in range(vertex_index_1, rank):
                 adj_mat[edge[vertex_index_1], edge[vertex_index_2]] += new_weight
-                adj_mat[edge[vertex_index_2], edge[vertex_index_2]] += new_weight
+                adj_mat[edge[vertex_index_2], edge[vertex_index_1]] += new_weight
 
     return lightgraphs.LightGraph(adj_mat.tocsr())
 
@@ -124,6 +124,6 @@ def hypergraph_approximate_diffusion_reduction(hypergraph, x):
         for vertex_1 in min_vertices:
             for vertex_2 in max_vertices:
                 adj_mat[vertex_1, vertex_2] += new_edge_weight
-                adj_mat[vertex_2, vertex_2] += new_edge_weight
+                adj_mat[vertex_2, vertex_1] += new_edge_weight
 
     return lightgraphs.LightGraph(adj_mat.tocsr())

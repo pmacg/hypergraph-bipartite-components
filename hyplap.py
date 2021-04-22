@@ -9,7 +9,6 @@ import scipy as sp
 import scipy.sparse.linalg
 import matplotlib.pyplot as plt
 import sys
-import math
 from scipy.optimize import linprog
 
 

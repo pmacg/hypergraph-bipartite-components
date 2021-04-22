@@ -11,6 +11,7 @@ import scipy as sp
 import scipy.sparse.linalg
 import networkx as nx
 import matplotlib.pyplot as plt
+import hyplogging
 
 
 def find_densest_subset_mc(vertex_level_set, hypergraph, edge_info, debug=False):
@@ -292,9 +293,9 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
     # If we are computing the approximate gradient, do so and return from the function
     if approximate:
         approximate_induced_graph = hypreductions.hypergraph_approximate_diffusion_reduction(hypergraph, f)
-        diffusion_operator = hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ \
-            graph_diffusion_operator(approximate_induced_graph, normalised=False)
-        r = - diffusion_operator @ f
+        hypergraph_inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
+        diffusion_operator = graph_diffusion_operator(approximate_induced_graph, unnormalised=True)
+        r = - hypergraph_inverse_degree_matrix @ diffusion_operator @ f
         return r
 
     # Compute some standard information about every edge in the hypergraph
@@ -374,17 +375,29 @@ def graph_degree_matrix(graph, inverse=False):
         return sp.sparse.spdiags(degrees.flatten(), [0], m, n, format="csr")
 
 
-def graph_diffusion_operator(graph, normalised=True):
+def graph_diffusion_operator(graph, normalised=False, weighted=False, unnormalised=False):
     """
     Construct the operator (I + A D^{-1}) for the given graph. This is the diffusion operator on the measure space.
+
+    By default, this gives the operator on the measure space. By the command line arguments, it can also return the
+    operator on the weighted or normalised spaces.
+
     :param graph: A lightgraph object
-    :param normalised: If False, return instead the matrix (D + A)
+    :param normalised: Return the normalised operator (I + D^{-1/2} A D^{-1/2})
+    :param weighted: Return the weighted operator (I + D^{-1} A)
+    :param unnormalised: Return the raw graph operator (D + A)
     :return: a scipy matrix
     """
     adjacency_matrix = graph.adj_mat
     n, m = adjacency_matrix.shape
 
-    if not normalised:
+    if normalised:
+        inverse_sqrt_degree_matrix = graph.inverse_sqrt_degree_matrix()
+        return sp.sparse.identity(n) + inverse_sqrt_degree_matrix @ adjacency_matrix @ inverse_sqrt_degree_matrix
+    elif weighted:
+        inverse_degree_matrix = graph.inverse_degree_matrix()
+        return sp.sparse.identity(n) + inverse_degree_matrix @ adjacency_matrix
+    elif unnormalised:
         degree_matrix = graph.degree_matrix()
         return degree_matrix + adjacency_matrix
     else:
@@ -410,6 +423,11 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
     :param approximate: Whether to use the approximate no-LP version of the diffusion operator
     :return: A measure vector at the end of the process, the final time of the diffusion process, the sequence of G(T)
     """
+    hyplogging.logger.info(f"Beginning heat diffusion process.")
+    hyplogging.logger.info(f"   max_time        = {max_time}")
+    hyplogging.logger.info(f"   step            = {step}")
+    hyplogging.logger.info(f"   approximate     = {approximate}")
+    hyplogging.logger.info(f"   check_converged = {check_converged}")
     # If we are going to plot the diffusion process, we will show the following quantities:
     #  F(t) = \phi_t D^{-1} \phi_t
     #  - log F(t)
@@ -445,12 +463,16 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
                        hypergraph_measure_mc_laplacian(x_tn, hypergraph)) / (
                     x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
         else:
-            # Apply the approximate diffusion operator
+            # Apply the approximate diffusion operator. We construct the approximate reduced graph using the weighted
+            # vector f.
             f = hyplap.measure_to_weighted(x_t, hypergraph)
             approximate_diffusion_graph = hypreductions.hypergraph_approximate_diffusion_reduction(hypergraph, f)
             inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
-            diff_operator = graph_diffusion_operator(approximate_diffusion_graph, normalised=False)
-            grad_hyp = - diff_operator @ f
+            diffusion_operator_measure = graph_diffusion_operator(approximate_diffusion_graph, unnormalised=True) @\
+                inverse_degree_matrix
+
+            # We apply the measure operator directly to the measure vector x_t
+            grad_hyp = - diffusion_operator_measure @ x_t
             x_t += step * grad_hyp
 
             # Add the graph points for this time step
@@ -460,14 +482,16 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
             x_tn = x_t / this_ft
 
             # Approximate the value of this_gt using the matrices of the approximate induced graph
-            this_gt = (x_tn @ inverse_degree_matrix @ diff_operator @
-                       inverse_degree_matrix @ x_tn) / (x_tn @ inverse_degree_matrix @ x_tn)
+            this_gt = (x_tn @ inverse_degree_matrix @ diffusion_operator_measure @ x_tn) /\
+                      (x_tn @ inverse_degree_matrix @ x_tn)
         g_t.append(this_gt)
         if len(g_t) > 2:
             h_t.append((g_t[-2] - g_t[-1]) / step)
         elif len(g_t) == 2:
             h_t.append((g_t[-2] - g_t[-1]) / step)
             h_t.append((g_t[-2] - g_t[-1]) / step)
+
+        hyplogging.logger.debug(f"time: {t}; g_t: {this_gt}")
 
         # Check for convergence
         if check_converged:
@@ -477,17 +501,21 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
                 # Get the values of g(t) for 10 time steps ago, 5 time steps ago and 1 time step ago
                 prev_gts = [g_t[int((t - 10) / step)], g_t[int((t - 5) / step)], g_t[int((t - 1) / step)], this_gt]
                 diff = max(prev_gts) - min(prev_gts)
+
+                hyplogging.logger.debug(f"Convergence target = 0.0001; actual diff = {diff}")
+
                 if diff < 0.0001:
                     # We have converged
+                    hyplogging.logger.info(f"Diffusion process has converged at time {t}")
                     break
 
     # Print the final value of G(t). If the process is fully converged, then this is an eigenvalue of the hypergraph
     # laplacian operator.
-    this_ft = x_t @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_t
+    this_ft = x_t @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ x_t
     x_tn = x_t / this_ft
-    final_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @
+    final_gt = (x_tn @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @
                 hypergraph_measure_mc_laplacian(x_tn, hypergraph, approximate=approximate)) / (
-            x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
+            x_tn @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ x_tn)
     if print_time:
         print(f"Final value of G(t): {final_gt:.5f}")
 

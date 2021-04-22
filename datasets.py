@@ -1,9 +1,7 @@
 """
 This file provides an interface to each dataset we will use for our experiments.
 """
-import hypernetx as hnx
 import re
-
 import lightgraphs
 
 

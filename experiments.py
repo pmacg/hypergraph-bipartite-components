@@ -8,7 +8,7 @@ import hypcheeg
 import datasets
 
 
-def main():
+def random_hypergraph_experiments():
     """
     Run main experiments. Compare the four algorithms: clique, approx_diffusion_clique, random,
     approx_diffusion_random
@@ -141,7 +141,7 @@ def dataset_experiment(dataset):
 
     # Run the diffusion algorithm
     diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(dataset.hypergraph,
-                                                                                     step_size=1,
+                                                                                     step_size=1, max_time=100,
                                                                                      approximate=True)
     print(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
 

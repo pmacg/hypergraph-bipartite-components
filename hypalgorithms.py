@@ -68,11 +68,11 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
         # Construct the clique graph from the hypergraph
         weighted_clique_graph = hypreductions.hypergraph_clique_reduction(hypergraph)
 
-        # Compute the graph L = (I + AD^-1) of the clique graph
+        # Compute the operator L = (I + AD^-1) of the clique graph
         l_clique = hypmc.graph_diffusion_operator(weighted_clique_graph)
 
         # Compute the eigenvector corresponding to the smallest eigenvalue
-        eigenvalues, eigenvectors = sp.sparse.linalg.eigsh(l_clique, k=1, which='SM')
+        eigenvalues, eigenvectors = sp.sparse.linalg.eigs(l_clique, k=1, which='SM')
         s = eigenvectors[:, 0]
 
         return _internal_bipartite_diffusion(s, hypergraph, max_time, step_size, approximate)
@@ -87,11 +87,11 @@ def find_bipartite_set_clique(hypergraph):
     # Construct the clique graph from the hypergraph
     weighted_clique_graph = hypreductions.hypergraph_clique_reduction(hypergraph)
 
-    # Compute the graph L = (I + AD^-1) of the clique graph
+    # Compute the operator L = (I + AD^-1) of the clique graph
     l_clique = hypmc.graph_diffusion_operator(weighted_clique_graph)
 
     # Compute the eigenvector corresponding to the smallest eigenvalue
-    eigenvalues, eigenvectors = sp.sparse.linalg.eigsh(l_clique, k=1, which='SM')
+    eigenvalues, eigenvectors = sp.sparse.linalg.eigs(l_clique, k=1, which='SM')
     x = eigenvectors[:, 0]
 
     # Run the two-sided sweep set algorithm on this eigenvector

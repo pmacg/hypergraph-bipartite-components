@@ -57,6 +57,7 @@ class LightGraph(object):
         self.degrees = adj_mat.sum(axis=0).tolist()[0]
         self.inv_degrees = list(map(lambda x: 1 / x if x != 0 else 0, self.degrees))
         self.sqrt_degrees = list(map(math.sqrt, self.degrees))
+        self.inv_sqrt_degrees = list(map(lambda x: 1 / x if x > 0 else 0, self.sqrt_degrees))
 
         self.num_vertices = self.adj_mat.shape[0]
         self.num_edges = sum(self.degrees) / 2
@@ -66,3 +67,6 @@ class LightGraph(object):
 
     def inverse_degree_matrix(self):
         return sp.sparse.spdiags(self.inv_degrees, [0], self.num_vertices, self.num_vertices, format="csr")
+
+    def inverse_sqrt_degree_matrix(self):
+        return sp.sparse.spdiags(self.inv_sqrt_degrees, [0], self.num_vertices, self.num_vertices, format="csr")
