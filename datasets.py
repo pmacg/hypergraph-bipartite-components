@@ -43,7 +43,7 @@ class Dataset(object):
 
         with open(filename, 'r') as f_in:
             for line in f_in.readlines():
-                vertices = [int(x) + offset for x in re.split("[ ,]", line.strip())]
+                vertices = [int(x) + offset for x in re.split("[ ,\t]", line.strip())]
                 hypergraph_edges.append(vertices)
 
         # Construct and return the hypergraph
@@ -144,4 +144,21 @@ class FoodWebDataset(Dataset):
                                       "data/foodweb/foodweb.clusters",
                                       vertex_zero_indexed=False,
                                       clusters_zero_indexed=False)
+        self.is_loaded = True
+
+
+class FoodWebHFDDataset(Dataset):
+    """The foodweb dataset, as used in the paper "Local HyperFlow Diffusion".
+    See the github project here: https://github.com/s-h-yang/HFD
+    """
+
+    def load_data(self):
+        self.load_edgelist_and_labels("data/foodweb-hfd/foodweb_edges.txt",
+                                      "data/foodweb-hfd/foodweb_species.txt",
+                                      None,
+                                      "data/foodweb-hfd/foodweb_labels.txt",
+                                      None,
+                                      vertex_zero_indexed=False,
+                                      clusters_zero_indexed=False)
+        self.cluster_labels = ["Producers", "Low-level consumers", "High-level consumers"]
         self.is_loaded = True

@@ -8,6 +8,7 @@ import scipy.sparse
 import hypcheeg
 import hypmc
 import lightgraphs
+import hyplogging
 
 
 def hypergraph_min_edges_graph_reduction(hypergraph):
@@ -43,9 +44,9 @@ def hypergraph_min_edges_graph_reduction(hypergraph):
 def hypergraph_degree_graph_reduction(hypergraph, c=1):
     """
     Construct a simple graph by sampling based on vertex degrees.
-    :param hypergraph: The hypergraph
+    :param hypergraph: The hypergraph as a hypernetx object.
     :param c: A parameter to the random process. Roughly the number of vertices to select a single hyperedge.
-    :return: A graph G
+    :return: A graph G, as a networkx object.
     """
     new_graph = nx.Graph()
     m = len([e for e in hypergraph.edges()])
@@ -87,10 +88,18 @@ def hypergraph_clique_reduction(hypergraph):
     :param hypergraph:
     :return: A LightGraph G
     """
+    hyplogging.logger.debug(f"Initialising the adjacency matrix.")
+    hyplogging.logger.debug(f"Number of vertices: {hypergraph.num_vertices}.")
     adj_mat = sp.sparse.lil_matrix((hypergraph.num_vertices, hypergraph.num_vertices))
 
     # Add the edges to the graph.
-    for edge in hypergraph.edges:
+    m = hypergraph.num_edges
+    hyplogging.logger.debug("Adding the edges.")
+    hyplogging.logger.debug(f"Number of edges: {m}.")
+    for i, edge in enumerate(hypergraph.edges):
+        if i % 1000 == 0:
+            hyplogging.logger.debug(f"Adding edge {i}/{m}.")
+
         rank = len(edge)
         new_weight = 1 / (rank - 1) if rank > 1 else 0
         for vertex_index_1 in range(rank):
@@ -98,6 +107,7 @@ def hypergraph_clique_reduction(hypergraph):
                 adj_mat[edge[vertex_index_1], edge[vertex_index_2]] += new_weight
                 adj_mat[edge[vertex_index_2], edge[vertex_index_1]] += new_weight
 
+    hyplogging.logger.debug("Constructing and returning the LightGraph object.")
     return lightgraphs.LightGraph(adj_mat.tocsr())
 
 

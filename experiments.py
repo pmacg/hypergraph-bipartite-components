@@ -6,6 +6,7 @@ import hypconstruct
 import hypalgorithms
 import hypcheeg
 import datasets
+import hyplogging
 
 
 def random_hypergraph_experiments():
@@ -136,21 +137,56 @@ def dataset_experiment(dataset):
     Run a test of our algorithm on a given dataset.
     """
     # Run the clique algorithm
+    hyplogging.logger.info("Running the clique algorithm.")
     clique_alg_l, clique_alg_r, clique_bipart = hypalgorithms.find_bipartite_set_clique(dataset.hypergraph)
     print(f"Clique algorithm bipartiteness: {clique_bipart}\n")
 
     # Run the diffusion algorithm
+    hyplogging.logger.info("Running the diffusion algorithm.")
     diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(dataset.hypergraph,
                                                                                      step_size=1, max_time=100,
                                                                                      approximate=True)
     print(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
 
 
-if __name__ == "__main__":
+def foodweb_experiment():
     print("Loading dataset...")
-    # congress_dataset = datasets.CongressCommitteesDataset()
-    # imdb_dataset = datasets.ImdbDataset()
+    hyplogging.logger.info("Loading the foodweb dataset.")
     foodweb_dataset = datasets.FoodWebDataset()
 
+    print("Running diffusion....")
+    hyplogging.logger.info("Running the diffusion process on the foodweb graph.")
+    left, right, bipart = hypalgorithms.find_bipartite_set_diffusion(foodweb_dataset.hypergraph,
+                                                                     step_size=1, max_time=100,
+                                                                     approximate=True)
+    print(f"Diffusion algorithm bipartiteness: {bipart}\n")
+
+    # Now show the results of the diffusion process
+    print("LEFT SET")
+    for index in left:
+        vertex_name = foodweb_dataset.vertex_labels[index]
+        vertex_cluster = foodweb_dataset.cluster_labels[foodweb_dataset.gt_clusters[index]] if \
+            foodweb_dataset.gt_clusters[index] is not None else 'missing'
+        print(f"{vertex_name}\t\t{vertex_cluster}")
+
+    print()
+    print()
+    print("RIGHT SET")
+    for index in right:
+        vertex_name = foodweb_dataset.vertex_labels[index]
+        vertex_cluster = foodweb_dataset.cluster_labels[foodweb_dataset.gt_clusters[index]] if \
+            foodweb_dataset.gt_clusters[index] is not None else 'missing'
+        print(f"{vertex_name}\t\t{vertex_cluster}")
+
+
+def imdb_experiment():
+    print("Loading dataset...")
+    hyplogging.logger.info("Loading the imdb dataset.")
+    imdb_dataset = datasets.ImdbDataset()
+
     print("Running algorithms...")
-    dataset_experiment(foodweb_dataset)
+    dataset_experiment(imdb_dataset)
+
+
+if __name__ == "__main__":
+    imdb_experiment()

@@ -5,6 +5,7 @@ import scipy.sparse.linalg
 import hypcheeg
 import hypmc
 import hypreductions
+import hyplogging
 
 
 def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_size, approximate):
@@ -85,16 +86,20 @@ def find_bipartite_set_clique(hypergraph):
     :return: the sets L and R, and the bipartiteness value beta(L, R)
     """
     # Construct the clique graph from the hypergraph
+    hyplogging.logger.debug("Constructing the clique graph.")
     weighted_clique_graph = hypreductions.hypergraph_clique_reduction(hypergraph)
 
     # Compute the operator L = (I + AD^-1) of the clique graph
+    hyplogging.logger.debug("Computing the clique graph diffusion operator.")
     l_clique = hypmc.graph_diffusion_operator(weighted_clique_graph)
 
     # Compute the eigenvector corresponding to the smallest eigenvalue
+    hyplogging.logger.debug("Computing the eigenvalues and eigenvectors.")
     eigenvalues, eigenvectors = sp.sparse.linalg.eigs(l_clique, k=1, which='SM')
     x = eigenvectors[:, 0]
 
     # Run the two-sided sweep set algorithm on this eigenvector
+    hyplogging.logger.debug("Running the sweep-set procedure.")
     vertex_set_l, vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(x, hypergraph)
     beta = hypcheeg.hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r)
 
