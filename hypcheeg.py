@@ -2,6 +2,7 @@
 This file implements various methods for studying the spectral properties of hypergraphs and their related graphs.
 """
 import numpy as np
+import hyplogging
 
 
 def graph_cut_size(graph, vertex_set):
@@ -154,9 +155,10 @@ def hypergraph_two_sided_sweep(x, hypergraph):
     all_vertices = hypergraph.nodes
     all_edges = hypergraph.edges
     dict_vertices_to_adjacent_edges = {v: [] for v in all_vertices}
+    hyplogging.logger.debug("Constructing dictionary of adjacent edges.")
     for edge in all_edges:
         for vertex in edge:
-            dict_vertices_to_adjacent_edges[vertex].append(edge)
+            dict_vertices_to_adjacent_edges[vertex].append(set(edge))
 
     best_l = set()
     best_r = set()
@@ -169,10 +171,15 @@ def hypergraph_two_sided_sweep(x, hypergraph):
     current_numerator = 0
 
     # Get the sorted indices of x, in order of highest absolute value to lowest
+    hyplogging.logger.debug("Sorting the vertices according to given vector.")
     ordering = reversed(np.argsort(abs(x)))
 
     # Perform the sweep
-    for vertex_index in ordering:
+    hyplogging.logger.debug("Checking each sweep set.")
+    for i, vertex_index in enumerate(ordering):
+        if i % 1000 == 0:
+            hyplogging.logger.debug(f"Checking sweep set number {i}/{hypergraph.num_vertices}.")
+
         # Add the next vertex to the candidate set
         added_to_l = False
         if x[vertex_index] >= 0:
@@ -184,10 +191,10 @@ def hypergraph_two_sided_sweep(x, hypergraph):
         # Update the bipartiteness values
         current_vol += hypergraph.degree(all_vertices[vertex_index])
         for edge in dict_vertices_to_adjacent_edges[all_vertices[vertex_index]]:
-            edge_l_intersection = len([v for v in edge if v in current_l])
-            edge_r_intersection = len([v for v in edge if v in current_r])
-            edge_entirely_inside_l = len([v for v in edge if v not in current_l]) == 0
-            edge_entirely_inside_r = len([v for v in edge if v not in current_r]) == 0
+            edge_l_intersection = len(current_l.intersection(edge))
+            edge_r_intersection = len(current_r.intersection(edge))
+            edge_entirely_inside_l = edge_l_intersection == len(edge)
+            edge_entirely_inside_r = edge_r_intersection == len(edge)
 
             if edge_entirely_inside_l:
                 current_numerator += 1

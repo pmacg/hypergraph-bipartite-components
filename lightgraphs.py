@@ -46,6 +46,28 @@ class LightHypergraph(object):
     def number_of_edges(self):
         return self.num_edges
 
+    def induced_hypergraph(self, node_list):
+        """
+        Construct the hypergraph induced by the given nodes. The node indices in the induced graph will equal their
+        index in the given list.
+
+        :param node_list:
+        :return:
+        """
+        # The given list should have unique elements
+        assert(len(set(node_list)) == len(node_list))
+        node_list_set = set(node_list)
+
+        # In order to construct the induced graph, we need to construct a list of edges in the new hypergraph.
+        new_edges = []
+        for edge in self.edges:
+            if len(node_list_set.intersection(edge)) == len(edge):
+                # This edge should be included in the induced hypergraph.
+                new_edges.append([node_list.index(v) for v in edge])
+
+        # Construct the new hypergraph and return it
+        return LightHypergraph(new_edges)
+
 
 class LightGraph(object):
     """What is a graph, but an adjacency matrix?"""
