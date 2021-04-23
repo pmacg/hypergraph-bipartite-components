@@ -139,6 +139,7 @@ def dataset_experiment(dataset):
     # Run the clique algorithm
     hyplogging.logger.info("Running the clique algorithm.")
     clique_alg_l, clique_alg_r, clique_bipart = hypalgorithms.find_bipartite_set_clique(dataset.hypergraph)
+    hyplogging.logger.info(f"Clique algorithm bipartiteness: {clique_bipart}\n")
     print(f"Clique algorithm bipartiteness: {clique_bipart}\n")
 
     # Run the diffusion algorithm
@@ -146,6 +147,7 @@ def dataset_experiment(dataset):
     diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(dataset.hypergraph,
                                                                                      step_size=1, max_time=100,
                                                                                      approximate=True)
+    hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
     print(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
 
 
@@ -159,6 +161,7 @@ def foodweb_experiment():
     left, right, bipart = hypalgorithms.find_bipartite_set_diffusion(foodweb_dataset.hypergraph,
                                                                      step_size=1, max_time=100,
                                                                      approximate=True)
+    hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {bipart}\n")
     print(f"Diffusion algorithm bipartiteness: {bipart}\n")
 
     # Now show the results of the diffusion process
@@ -189,4 +192,4 @@ def imdb_experiment():
 
 
 if __name__ == "__main__":
-    imdb_experiment()
+    foodweb_experiment()
