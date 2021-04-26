@@ -1,29 +1,40 @@
 """
 This file implements various methods for studying the spectral properties of hypergraphs and their related graphs.
 """
+import networkx as nx
 import numpy as np
 import hyplogging
 
 
-def graph_cut_size(graph, vertex_set):
+def networkx_directed_cut_size(graph, vertex_set_l, vertex_set_r=None):
     """
-    Compute the cut size of a set S in a graph
+    Compute the cut size between sets S and T in a directed networkx graph.
+
+    If T is not given, assume it is the complement of S.
+
     :param graph: The graph as a networkx object
-    :param vertex_set: The vertex set in question, as a list
-    :return: The size of cut(S, V - S)
+    :param vertex_set_l: The vertex set S
+    :param vertex_set_r: The vertex set T, or None
+    :return: The size of cut(S, T)
     """
-    cut_size = 0
+    edges = nx.edge_boundary(graph, vertex_set_l, vertex_set_r, data="weight", default=1)
+    return sum(weight for u, v, weight in edges)
 
-    # Iterate through the edges to find those in the cut
-    for edge in graph.edges():
-        edge_intersects_vertex_set = len([v for v in edge if v in vertex_set]) > 0
-        edge_entirely_inside_vertex_set = len([v for v in edge if v not in vertex_set]) == 0
 
-        # If this edge is on the cut, add one to the total
-        if edge_intersects_vertex_set and not edge_entirely_inside_vertex_set:
-            cut_size += 1
+def clsz_cut_imbalance(graph, vertex_set_l, vertex_set_r):
+    """
+    Compute the cut imbalance between the sets L and R as specified in CLSZ. This is defined to be
 
-    return cut_size
+        CI(S, T) = 1/2 * abs[ (w(S, T) - w(T, S)) / (w(S, T) + w(T, S)) ]
+
+    :param graph: the directed graph on which to operate
+    :param vertex_set_l: the set S
+    :param vertex_set_r: the set T
+    :return: the cut imbalance ration CI(S, T)
+    """
+    w_s_t = networkx_directed_cut_size(graph, vertex_set_l, vertex_set_r)
+    w_t_s = networkx_directed_cut_size(graph, vertex_set_r, vertex_set_l)
+    return (1/2) * abs((w_s_t - w_t_s) / (w_s_t + w_t_s))
 
 
 def hypergraph_cut_size(hypergraph, vertex_set):
@@ -253,7 +264,7 @@ def graph_self_loop_conductance(vertex_set, graph, hypergraph):
     """
     vol_s = hypergraph_volume(hypergraph, vertex_set)
     vol_s_complement = hypergraph_volume(hypergraph, vertex_set, complement=True)
-    cut_s = graph_cut_size(graph, vertex_set)
+    cut_s = nx.cut_size(graph, vertex_set)
 
     if min(vol_s, vol_s_complement) == 0:
         return 1

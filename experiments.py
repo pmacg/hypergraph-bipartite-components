@@ -2,6 +2,7 @@
 This file implements some experiments on the hypergraph diffusion operator.
 """
 import time
+import clsz.cluster
 import hypconstruct
 import hypalgorithms
 import hypcheeg
@@ -182,5 +183,64 @@ def imdb_experiment():
     dataset_experiment(imdb_dataset)
 
 
+def log_migration_result(migration_dataset, title, left_set, right_set):
+    """
+    Given a pair of clusters in the migration dataset, display their evaluation.
+
+    :param migration_dataset:
+    :param title: The title of this result
+    :param left_set:
+    :param right_set:
+    :return: nothing
+    """
+    bipartiteness = hypcheeg.hypergraph_bipartiteness(migration_dataset.hypergraph, left_set, right_set)
+    cut_imbalance = hypcheeg.clsz_cut_imbalance(migration_dataset.directed_graph, left_set, right_set)
+    hyplogging.logger.info(f"{title}")
+    hyplogging.logger.info(f"  Hypergraph Bipartiteness: {bipartiteness}")
+    hyplogging.logger.info(f"             Cut Imbalance: {cut_imbalance}")
+    print(f"{title}")
+    print(f"  Hypergraph Bipartiteness: {bipartiteness}")
+    print(f"             Cut Imbalance: {cut_imbalance}")
+
+
+def migration_experiment():
+    """Compare our algorithm to the CLSZ algorithm on the migration dataset. We will compare them on the following
+    three metrics:
+      - Hypergraph bipartiteness
+      - Graph bipartiteness
+      - Graph flow ratio (as described in CLSZ)
+    """
+    migration_dataset = datasets.MigrationDataset()
+
+    hyplogging.logger.info("Running CLSZ algorithm.")
+    clsz_labels = clsz.cluster.cluster_networkx(migration_dataset.directed_graph, 10)
+    hyplogging.logger.info(f'CLSZ labels: {" ".join(map(str, clsz_labels))}')
+    print("CLSZ labels:", " ".join(map(str, clsz_labels)))
+
+    # Now, run the hypergraph clustering algorithm
+    hyplogging.logger.info("Running diffusion algorithm.")
+    diff_left, diff_right, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(migration_dataset.hypergraph,
+                                                                                    max_time=1, step_size=0.1,
+                                                                                    approximate=True)
+    hyplogging.logger.info(f"Diffusion left: {str(diff_left)}")
+    hyplogging.logger.info(f"Diffusion right: {str(diff_left)}")
+    hyplogging.logger.info(f"Diffusion bipartiteness: {diff_bipart}")
+    print("Diffusion left:", diff_left)
+    print("Diffusion right:", diff_right)
+    print("Diffusion bipartiteness:", diff_bipart)
+
+    # Now, we will display the vitalstatistix of both algorithm.
+    # For each pair of clusters in the CLSZ results, display the key results
+    for cluster_idx_1 in range(10):
+        for cluster_idx_2 in range(cluster_idx_1 + 1, 10):
+            cluster_1 = [i for (i, label) in enumerate(clsz_labels) if label == cluster_idx_1]
+            cluster_2 = [i for (i, label) in enumerate(clsz_labels) if label == cluster_idx_2]
+            log_migration_result(migration_dataset, f"CLSZ Clusters {cluster_idx_1} and {cluster_idx_2}",
+                                 cluster_1, cluster_2)
+
+    # Now, print the results for the hypergraph diffusion algorithm
+    log_migration_result(migration_dataset, f"Diffusion Algorithm", diff_left, diff_right)
+
+
 if __name__ == "__main__":
-    foodweb_experiment()
+    migration_experiment()

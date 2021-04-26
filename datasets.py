@@ -2,6 +2,11 @@
 This file provides an interface to each dataset we will use for our experiments.
 """
 import re
+from scipy.io import loadmat
+from uszipcode import SearchEngine
+import numpy as np
+import networkx as nx
+import hyplogging
 import lightgraphs
 
 
@@ -162,3 +167,84 @@ class FoodWebHFDDataset(Dataset):
                                       clusters_zero_indexed=False)
         self.cluster_labels = ["Producers", "Low-level consumers", "High-level consumers"]
         self.is_loaded = True
+
+
+class MigrationDataset(Dataset):
+    """
+    The Migration dataset. This dataset includes both a hypergraph and the original directed graph for comparison
+    of hypergraph algorithms with directed graph algorithms.
+    """
+
+    def __init__(self):
+        hyplogging.logger.info("Loading migration dataset.")
+        self.directed_graph = None
+        self.zipcodes = None
+        super().__init__()
+
+    def load_data(self):
+        # We construct the directed graph from the migration data as described in the CLSZ paper.
+        hyplogging.logger.debug("Reading the adjacency matrix into a graph.")
+        all_data = loadmat('data/migration/ALL_CENSUS_DATA_FEB_2015.mat')
+        adjacency_matrix = all_data['MIG']
+        normalised_adj_mat = np.divide(adjacency_matrix, (adjacency_matrix + adjacency_matrix.T))
+        normalised_adj_mat[np.isnan(normalised_adj_mat)] = 0
+        normalised_adj_mat[np.isinf(normalised_adj_mat)] = 0
+        directed_adjacency_matrix = normalised_adj_mat - normalised_adj_mat.T
+        directed_adjacency_matrix[directed_adjacency_matrix < 0] = 0
+        self.directed_graph = nx.to_networkx_graph(directed_adjacency_matrix, create_using=nx.DiGraph)
+
+        # We now construct a hypergraph from the weighted, directed graph in the following way:
+        #   - for each vertex, we consider its 'outgoing' neighbours in turn, starting with the largest weight.
+        #   - we bundle them into groups such that the total weight in each group is at least 0.8
+        #   - we add a hyperedge for each bundle
+        # We throw away small-weighted edges where we cannot sum them to 0.8.
+        hyplogging.logger.debug("Constructing migration hypergraph.")
+        hyperedges = []
+        for vertex in self.directed_graph.nodes:
+            neighbours = list(nx.neighbors(self.directed_graph, vertex))
+            sorted_neighbours = sorted(neighbours, key=(lambda x: directed_adjacency_matrix[vertex, x]))
+
+            # Construct the hyperedges for this vertex
+            new_edge = [vertex]
+            new_edge_weight = 0
+            while len(sorted_neighbours) > 0:
+                u = sorted_neighbours.pop()
+                new_edge.append(u)
+                new_edge_weight += directed_adjacency_matrix[vertex, u]
+
+                if new_edge_weight > 0.8:
+                    hyperedges.append(new_edge)
+                    new_edge = [vertex]
+                    new_edge_weight = 0
+
+        self.hypergraph = lightgraphs.LightHypergraph(hyperedges)
+        self.num_vertices = self.hypergraph.num_vertices
+        self.num_edges = self.hypergraph.num_edges
+
+        hyplogging.logger.debug("Generating zipcodes.")
+        self.zipcodes = self.get_migration_zipcodes()
+
+
+    @staticmethod
+    def get_migration_zipcodes():
+        m = loadmat('data/migration/ALL_CENSUS_DATA_FEB_2015.mat')
+
+        # This is the array of latitude and longitude values for each vertex in the graph
+        lat_long = list(map(list, zip(*m['A'])))
+        long = lat_long[0]
+        lat = lat_long[1]
+
+        search = SearchEngine()
+
+        zip_codes = []
+        last_zipcode = 0
+        for v in range(len(long)):
+            result = search.by_coordinates(lat[v], long[v], returns=1)
+            if len(result) > 0:
+                zipcode = result[0].to_dict()["zipcode"]
+            else:
+                zipcode = last_zipcode
+            last_zipcode = zipcode
+            zip_codes.append(zipcode)
+
+        return zip_codes
