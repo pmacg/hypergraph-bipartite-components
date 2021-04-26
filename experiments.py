@@ -224,10 +224,9 @@ def migration_experiment():
                                                                                     approximate=True)
     hyplogging.logger.info(f"Diffusion left: {str(diff_left)}")
     hyplogging.logger.info(f"Diffusion right: {str(diff_left)}")
-    hyplogging.logger.info(f"Diffusion bipartiteness: {diff_bipart}")
     print("Diffusion left:", diff_left)
     print("Diffusion right:", diff_right)
-    print("Diffusion bipartiteness:", diff_bipart)
+    print()
 
     # Now, we will display the vitalstatistix of both algorithm.
     # For each pair of clusters in the CLSZ results, display the key results
