@@ -218,7 +218,7 @@ def hypergraph_two_sided_sweep(x, hypergraph):
                     current_numerator -= 1
 
         # Get the bipartiteness and check if it is best so far
-        beta = current_numerator / current_vol
+        beta = current_numerator / current_vol if current_vol != 0 else 1
         if beta < best_bipartiteness:
             best_bipartiteness = beta
             best_l = current_l.copy()
