@@ -102,14 +102,11 @@ def hypergraph_volume(hypergraph, vertex_set, complement=False):
     :param complement: Whether to find the volume of the set complement instead
     :return: vol(S)
     """
-    total_vol = 0
-    for vertex in hypergraph.nodes:
-        if vertex in vertex_set and not complement:
-            total_vol += hypergraph.degree(vertex)
-        if vertex not in vertex_set and complement:
-            total_vol += hypergraph.degree(vertex)
-
-    return total_vol
+    vertex_set = set(vertex_set)
+    if not complement:
+        return sum(hypergraph.degrees[v] for v in vertex_set)
+    else:
+        return sum(hypergraph.degrees[v] for v in hypergraph.nodes if v not in vertex_set)
 
 
 def hypergraph_conductance(hypergraph, vertex_set):

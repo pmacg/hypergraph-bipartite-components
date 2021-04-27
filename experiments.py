@@ -141,7 +141,6 @@ def dataset_experiment(dataset):
     hyplogging.logger.info("Running the clique algorithm.")
     clique_alg_l, clique_alg_r, clique_bipart = hypalgorithms.find_bipartite_set_clique(dataset.hypergraph)
     hyplogging.logger.info(f"Clique algorithm bipartiteness: {clique_bipart}\n")
-    print(f"Clique algorithm bipartiteness: {clique_bipart}\n")
 
     # Run the diffusion algorithm
     hyplogging.logger.info("Running the diffusion algorithm.")
@@ -149,7 +148,6 @@ def dataset_experiment(dataset):
                                                                                      step_size=1, max_time=100,
                                                                                      approximate=True)
     hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
-    print(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
 
 
 def foodweb_experiment():
@@ -175,12 +173,20 @@ def foodweb_experiment():
 
 
 def imdb_experiment():
-    print("Loading dataset...")
     hyplogging.logger.info("Loading the imdb dataset.")
     imdb_dataset = datasets.ImdbDataset()
+    imdb_dataset.use_subgraph("Hugh Grant", degrees_of_separation=3)
 
-    print("Running algorithms...")
-    dataset_experiment(imdb_dataset)
+    hyplogging.logger.info("Running the diffusion algorithm.")
+    diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(imdb_dataset.hypergraph,
+                                                                                     step_size=1, max_time=100,
+                                                                                     approximate=True)
+    hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
+    hyplogging.logger.info(f"   SET 1")
+    hyplogging.logger.info(str([imdb_dataset.vertex_labels[v] for v in diff_alg_l]))
+    hyplogging.logger.info(f"   SET 2")
+    hyplogging.logger.info(str([imdb_dataset.vertex_labels[v] for v in diff_alg_r]))
+
 
 
 def log_migration_result(filename, migration_dataset, title, left_set, right_set):
@@ -220,7 +226,8 @@ def migration_experiment():
     migration_dataset = datasets.MigrationDataset()
 
     hyplogging.logger.info("Running CLSZ algorithm.")
-    clsz_labels = clsz.cluster.cluster_networkx(migration_dataset.directed_graph, 10)
+    k = 2
+    clsz_labels = clsz.cluster.cluster_networkx(migration_dataset.directed_graph, k)
     hyplogging.logger.info(f'CLSZ labels: {" ".join(map(str, clsz_labels))}')
 
     # Now, run the hypergraph clustering algorithm
@@ -233,11 +240,11 @@ def migration_experiment():
 
     # Now, we will display the vitalstatistix of both algorithm.
     # For each pair of clusters in the CLSZ results, display the key results
-    output_csv_filename = "results/migration_experiment.csv"
+    output_csv_filename = f"results/migration_experiment_motif_{k}.csv"
     with open(output_csv_filename, 'w') as f_out:
         f_out.write("name, bipartiteness, ci, fr1, fr2\n")
-    for cluster_idx_1 in range(10):
-        for cluster_idx_2 in range(cluster_idx_1 + 1, 10):
+    for cluster_idx_1 in range(k):
+        for cluster_idx_2 in range(cluster_idx_1 + 1, k):
             cluster_1 = [i for (i, label) in enumerate(clsz_labels) if label == cluster_idx_1]
             cluster_2 = [i for (i, label) in enumerate(clsz_labels) if label == cluster_idx_2]
             log_migration_result(output_csv_filename, migration_dataset,
@@ -249,4 +256,4 @@ def migration_experiment():
 
 
 if __name__ == "__main__":
-    migration_experiment()
+    imdb_experiment()

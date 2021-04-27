@@ -27,10 +27,13 @@ class LightHypergraph(object):
         self.num_edges = len(self.edges)
         self.num_vertices = max(max(self.edges, key=max)) + 1
         self.nodes = list(range(self.num_vertices))
+        self.neighbours = {node: set() for node in self.nodes}
 
         self.degrees = [0] * self.num_vertices
         for edge in self.edges:
             for vertex in edge:
+                self.neighbours[vertex] = self.neighbours[vertex].union(edge)
+                self.neighbours[vertex].remove(vertex)
                 self.degrees[vertex] += 1
 
         self.inv_degrees = list(map(lambda x: 1 / x if x > 0 else 0, self.degrees))
