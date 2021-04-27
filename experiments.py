@@ -175,7 +175,7 @@ def foodweb_experiment():
 def imdb_experiment():
     hyplogging.logger.info("Loading the imdb dataset.")
     imdb_dataset = datasets.ImdbDataset()
-    imdb_dataset.use_subgraph("Hugh Grant", degrees_of_separation=3)
+    imdb_dataset.use_subgraph("Hugh Grant", degrees_of_separation=2)
 
     hyplogging.logger.info("Running the diffusion algorithm.")
     diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(imdb_dataset.hypergraph,
@@ -187,6 +187,8 @@ def imdb_experiment():
     hyplogging.logger.info(f"   SET 2")
     hyplogging.logger.info(str([imdb_dataset.vertex_labels[v] for v in diff_alg_r]))
 
+    imdb_dataset.simple_cluster_check("Left Set", diff_alg_l)
+    imdb_dataset.simple_cluster_check("Right Set", diff_alg_r)
 
 
 def log_migration_result(filename, migration_dataset, title, left_set, right_set):

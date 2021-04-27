@@ -133,9 +133,10 @@ class ImdbDataset(Dataset):
         self.load_edgelist_and_labels("data/imdb/credit.edgelist",
                                       "data/imdb/credit.vertices",
                                       "data/imdb/credit.edges",
-                                      None,
-                                      None,
-                                      vertex_zero_indexed=False)
+                                      "data/imdb/credit.gt",
+                                      "data/imdb/credit.clusters",
+                                      vertex_zero_indexed=False,
+                                      clusters_zero_indexed=False)
         self.is_loaded = True
 
     def use_subgraph(self, seed_actor, degrees_of_separation=2):
@@ -190,7 +191,23 @@ class ImdbDataset(Dataset):
 
         # Update the labels
         self.vertex_labels = [self.vertex_labels[old_indices[u]] for u in range(self.num_vertices)]
+        self.gt_clusters = [self.gt_clusters[old_indices[u]] for u in range(self.num_vertices)]
         self.edge_labels = [self.edge_labels[old_edges_indices[u]] for u in range(self.num_edges)]
+
+    def simple_cluster_check(self, cluster_name, cluster):
+        """
+        Given some set of vertices, break it down by percentages of each class.
+
+        :param cluster_name:
+        :param cluster:
+        """
+        cluster_size = len(cluster)
+        gts = [self.gt_clusters[u] for u in cluster]
+
+        hyplogging.logger.info(f"{cluster_name} breakdown:")
+        for gt_id, cluster_label in enumerate(self.cluster_labels):
+            proportion = gts.count(gt_id) / cluster_size
+            hyplogging.logger.info(f"   {cluster_label}: {proportion}")
 
 
 class FoodWebDataset(Dataset):
