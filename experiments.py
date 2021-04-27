@@ -183,10 +183,11 @@ def imdb_experiment():
     dataset_experiment(imdb_dataset)
 
 
-def log_migration_result(migration_dataset, title, left_set, right_set):
+def log_migration_result(filename, migration_dataset, title, left_set, right_set):
     """
-    Given a pair of clusters in the migration dataset, display their evaluation.
+    Given a pair of clusters in the migration dataset, display their evaluation, and write it to the output csv file.
 
+    :param filename:
     :param migration_dataset:
     :param title: The title of this result
     :param left_set:
@@ -205,6 +206,8 @@ def log_migration_result(migration_dataset, title, left_set, right_set):
     hyplogging.logger.info(f"             Cut Imbalance: {cut_imbalance}")
     hyplogging.logger.info(f"                Flow Ratio: {flow_ratio_left_right}")
     hyplogging.logger.info(f"       Reversed Flow Ratio: {flow_ratio_right_left}")
+    with open(filename, 'a') as f_out:
+        f_out.write(f"{title}, {bipartiteness}, {cut_imbalance}, {flow_ratio_left_right}, {flow_ratio_right_left}\n")
 
 
 def migration_experiment():
@@ -230,15 +233,19 @@ def migration_experiment():
 
     # Now, we will display the vitalstatistix of both algorithm.
     # For each pair of clusters in the CLSZ results, display the key results
+    output_csv_filename = "results/migration_experiment.csv"
+    with open(output_csv_filename, 'w') as f_out:
+        f_out.write("name, bipartiteness, ci, fr1, fr2\n")
     for cluster_idx_1 in range(10):
         for cluster_idx_2 in range(cluster_idx_1 + 1, 10):
             cluster_1 = [i for (i, label) in enumerate(clsz_labels) if label == cluster_idx_1]
             cluster_2 = [i for (i, label) in enumerate(clsz_labels) if label == cluster_idx_2]
-            log_migration_result(migration_dataset, f"CLSZ Clusters {cluster_idx_1} and {cluster_idx_2}",
+            log_migration_result(output_csv_filename, migration_dataset,
+                                 f"CLSZ Clusters {cluster_idx_1} and {cluster_idx_2}",
                                  cluster_1, cluster_2)
 
     # Now, print the results for the hypergraph diffusion algorithm
-    log_migration_result(migration_dataset, f"Diffusion Algorithm", diff_left, diff_right)
+    log_migration_result(output_csv_filename, migration_dataset, f"Diffusion Algorithm", diff_left, diff_right)
 
 
 if __name__ == "__main__":
