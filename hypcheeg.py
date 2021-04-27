@@ -45,6 +45,9 @@ def clsz_cut_imbalance(graph, vertex_set_l, vertex_set_r):
     :param vertex_set_r: the set T
     :return: the cut imbalance ratio CI(S, T)
     """
+    hyplogging.logger.debug("Computing cut imbalance.")
+    hyplogging.logger.debug(f"    Left set size: {len(vertex_set_l)}")
+    hyplogging.logger.debug(f"   Right set size: {len(vertex_set_r)}")
     w_s_t = networkx_directed_cut_size(graph, vertex_set_l, vertex_set_r)
     w_t_s = networkx_directed_cut_size(graph, vertex_set_r, vertex_set_l)
     return (1/2) * abs((w_s_t - w_t_s) / (w_s_t + w_t_s))
@@ -61,6 +64,9 @@ def ms_flow_ratio(graph, vertex_set_l, vertex_set_r):
     :param vertex_set_r:
     :return: the flow ratio FR(S, T)
     """
+    hyplogging.logger.debug("Computing flow ratio.")
+    hyplogging.logger.debug(f"    Left set size: {len(vertex_set_l)}")
+    hyplogging.logger.debug(f"   Right set size: {len(vertex_set_r)}")
     w_s_t = networkx_directed_cut_size(graph, vertex_set_l, vertex_set_r)
     vol_out_s = nx.volume(graph, vertex_set_l, weight="weight")
     vol_in_t = networkx_volume_in(graph, vertex_set_r)
@@ -132,6 +138,9 @@ def hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r):
     :param vertex_set_r: the vertex set R
     :return: the bipartiteness beta(L, R)
     """
+    hyplogging.logger.debug("Computing hypergraph bipartiteness.")
+    hyplogging.logger.debug(f"    Left set size: {len(vertex_set_l)}")
+    hyplogging.logger.debug(f"   Right set size: {len(vertex_set_r)}")
     vol_s = hypergraph_volume(hypergraph, vertex_set_l + vertex_set_r)
 
     w_l_not_l = 0

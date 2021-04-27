@@ -193,6 +193,9 @@ def log_migration_result(migration_dataset, title, left_set, right_set):
     :param right_set:
     :return: nothing
     """
+    hyplogging.logger.debug("Computing objectives for migration result.")
+    hyplogging.logger.debug(f"    Left set: {str(left_set)}")
+    hyplogging.logger.debug(f"   Right set: {str(right_set)}")
     bipartiteness = hypcheeg.hypergraph_bipartiteness(migration_dataset.hypergraph, left_set, right_set)
     cut_imbalance = hypcheeg.clsz_cut_imbalance(migration_dataset.directed_graph, left_set, right_set)
     flow_ratio_left_right = hypcheeg.ms_flow_ratio(migration_dataset.directed_graph, left_set, right_set)
@@ -223,7 +226,7 @@ def migration_experiment():
                                                                                     max_time=1, step_size=0.1,
                                                                                     approximate=True)
     hyplogging.logger.info(f"Diffusion left: {str(diff_left)}")
-    hyplogging.logger.info(f"Diffusion right: {str(diff_left)}")
+    hyplogging.logger.info(f"Diffusion right: {str(diff_right)}")
 
     # Now, we will display the vitalstatistix of both algorithm.
     # For each pair of clusters in the CLSZ results, display the key results
