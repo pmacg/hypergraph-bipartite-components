@@ -258,4 +258,4 @@ def migration_experiment():
 
 
 if __name__ == "__main__":
-    imdb_experiment()
+    migration_experiment()
