@@ -195,12 +195,13 @@ def log_migration_result(migration_dataset, title, left_set, right_set):
     """
     bipartiteness = hypcheeg.hypergraph_bipartiteness(migration_dataset.hypergraph, left_set, right_set)
     cut_imbalance = hypcheeg.clsz_cut_imbalance(migration_dataset.directed_graph, left_set, right_set)
+    flow_ratio_left_right = hypcheeg.ms_flow_ratio(migration_dataset.directed_graph, left_set, right_set)
+    flow_ratio_right_left = hypcheeg.ms_flow_ratio(migration_dataset.directed_graph, right_set, left_set)
     hyplogging.logger.info(f"{title}")
     hyplogging.logger.info(f"  Hypergraph Bipartiteness: {bipartiteness}")
     hyplogging.logger.info(f"             Cut Imbalance: {cut_imbalance}")
-    print(f"{title}")
-    print(f"  Hypergraph Bipartiteness: {bipartiteness}")
-    print(f"             Cut Imbalance: {cut_imbalance}")
+    hyplogging.logger.info(f"                Flow Ratio: {flow_ratio_left_right}")
+    hyplogging.logger.info(f"       Reversed Flow Ratio: {flow_ratio_right_left}")
 
 
 def migration_experiment():
@@ -215,7 +216,6 @@ def migration_experiment():
     hyplogging.logger.info("Running CLSZ algorithm.")
     clsz_labels = clsz.cluster.cluster_networkx(migration_dataset.directed_graph, 10)
     hyplogging.logger.info(f'CLSZ labels: {" ".join(map(str, clsz_labels))}')
-    print("CLSZ labels:", " ".join(map(str, clsz_labels)))
 
     # Now, run the hypergraph clustering algorithm
     hyplogging.logger.info("Running diffusion algorithm.")
@@ -224,9 +224,6 @@ def migration_experiment():
                                                                                     approximate=True)
     hyplogging.logger.info(f"Diffusion left: {str(diff_left)}")
     hyplogging.logger.info(f"Diffusion right: {str(diff_left)}")
-    print("Diffusion left:", diff_left)
-    print("Diffusion right:", diff_right)
-    print()
 
     # Now, we will display the vitalstatistix of both algorithm.
     # For each pair of clusters in the CLSZ results, display the key results

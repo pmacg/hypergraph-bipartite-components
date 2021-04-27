@@ -1,4 +1,5 @@
 import logging
+import sys
 
 # Create the logging object.
 logger = logging.getLogger('hyplap')
@@ -13,3 +14,10 @@ handler.setFormatter(formatter)
 
 # ... and set the handler
 logger.addHandler(handler)
+
+# Add another handler to print INFO and above to stdout
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_formatter = logging.Formatter("%(message)s")
+stdout_handler.setFormatter(stdout_formatter)
+stdout_handler.setLevel(logging.INFO)
+logger.addHandler(stdout_handler)

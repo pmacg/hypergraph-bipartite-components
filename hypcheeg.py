@@ -21,6 +21,19 @@ def networkx_directed_cut_size(graph, vertex_set_l, vertex_set_r=None):
     return sum(weight for u, v, weight in edges)
 
 
+def networkx_volume_in(graph, vertex_set):
+    """
+    Compute the 'volume' of in-degrees to the given vertex set in a directed graph. Closely based on the networkx code
+    for ordinary volume.
+
+    :param graph:
+    :param vertex_set:
+    :return: the 'in-volume' of the given set.
+    """
+    degree = graph.in_degree
+    return sum(d for v, d in degree(vertex_set, weight="weight"))
+
+
 def clsz_cut_imbalance(graph, vertex_set_l, vertex_set_r):
     """
     Compute the cut imbalance between the sets L and R as specified in CLSZ. This is defined to be
@@ -30,11 +43,28 @@ def clsz_cut_imbalance(graph, vertex_set_l, vertex_set_r):
     :param graph: the directed graph on which to operate
     :param vertex_set_l: the set S
     :param vertex_set_r: the set T
-    :return: the cut imbalance ration CI(S, T)
+    :return: the cut imbalance ratio CI(S, T)
     """
     w_s_t = networkx_directed_cut_size(graph, vertex_set_l, vertex_set_r)
     w_t_s = networkx_directed_cut_size(graph, vertex_set_r, vertex_set_l)
     return (1/2) * abs((w_s_t - w_t_s) / (w_s_t + w_t_s))
+
+
+def ms_flow_ratio(graph, vertex_set_l, vertex_set_r):
+    """
+    Compute the flow ratio between the sets L and R as specified by Macgregor and Sun. This is defined to be
+
+        FR(S, T) = 1 - 2 w(S, T) / (vol_out(S) + vol_in(T))
+
+    :param graph:
+    :param vertex_set_l:
+    :param vertex_set_r:
+    :return: the flow ratio FR(S, T)
+    """
+    w_s_t = networkx_directed_cut_size(graph, vertex_set_l, vertex_set_r)
+    vol_out_s = nx.volume(graph, vertex_set_l, weight="weight")
+    vol_in_t = networkx_volume_in(graph, vertex_set_r)
+    return 1 - 2 * w_s_t / (vol_out_s + vol_in_t)
 
 
 def hypergraph_cut_size(hypergraph, vertex_set):
