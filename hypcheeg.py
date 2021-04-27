@@ -102,14 +102,11 @@ def hypergraph_volume(hypergraph, vertex_set, complement=False):
     :param complement: Whether to find the volume of the set complement instead
     :return: vol(S)
     """
-    total_vol = 0
-    for vertex in hypergraph.nodes:
-        if vertex in vertex_set and not complement:
-            total_vol += hypergraph.degree(vertex)
-        if vertex not in vertex_set and complement:
-            total_vol += hypergraph.degree(vertex)
-
-    return total_vol
+    vertex_set = set(vertex_set)
+    if not complement:
+        return sum(hypergraph.degrees[v] for v in vertex_set)
+    else:
+        return sum(hypergraph.degrees[v] for v in hypergraph.nodes if v not in vertex_set)
 
 
 def hypergraph_conductance(hypergraph, vertex_set):
@@ -143,23 +140,27 @@ def hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r):
     hyplogging.logger.debug(f"   Right set size: {len(vertex_set_r)}")
     vol_s = hypergraph_volume(hypergraph, vertex_set_l + vertex_set_r)
 
+    vertex_set_l = set(vertex_set_l)
+    vertex_set_r = set(vertex_set_r)
+
     w_l_not_l = 0
     w_r_not_r = 0
     w_l_r = 0
     w_r_l = 0
     for edge in hypergraph.edges:
-        edge_intersects_l = len([v for v in edge if v in vertex_set_l]) > 0
-        edge_intersects_r = len([v for v in edge if v in vertex_set_r]) > 0
-        edge_entirely_inside_l = len([v for v in edge if v not in vertex_set_l]) == 0
-        edge_entirely_inside_r = len([v for v in edge if v not in vertex_set_r]) == 0
+        edge_set = set(edge)
+        edge_l_intersection = len(vertex_set_l.intersection(edge_set))
+        edge_r_intersection = len(vertex_set_r.intersection(edge_set))
+        edge_entirely_inside_l = edge_l_intersection == len(edge_set)
+        edge_entirely_inside_r = edge_r_intersection == len(edge_set)
 
         if edge_entirely_inside_l:
             w_l_not_l += 1
         if edge_entirely_inside_r:
             w_r_not_r += 1
-        if edge_intersects_l and not edge_intersects_r:
+        if edge_l_intersection > 0 and not edge_r_intersection > 0:
             w_l_r += 1
-        if edge_intersects_r and not edge_intersects_l:
+        if edge_r_intersection > 0 and not edge_r_intersection > 0:
             w_r_l += 1
 
     # Compute the bipartiteness
@@ -274,6 +275,7 @@ def hypergraph_two_sided_sweep(x, hypergraph):
             best_l = current_l.copy()
             best_r = current_r.copy()
 
+    hyplogging.logger.debug(f"Best bipartiteness in sweep set: {best_bipartiteness}")
     return list(best_l), list(best_r)
 
 
