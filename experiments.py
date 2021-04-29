@@ -268,12 +268,13 @@ def migration_experiment():
 
     # Now, run the hypergraph clustering algorithm
     hyplogging.logger.info("Running diffusion algorithm.")
-    diff_clusters = hypalgorithms.recursive_bipartite_diffusion(migration_dataset.hypergraph, iterations=1,
+    i = 1
+    diff_clusters = hypalgorithms.recursive_bipartite_diffusion(migration_dataset.hypergraph, iterations=i,
                                                                 max_time=100, step_size=0.1,
                                                                 approximate=True)
 
     # Now, we will display the vitalstatistix of both algorithm.
-    output_csv_filename = f"results/migration_experiment_motif_{k}.csv"
+    output_csv_filename = f"results/migration_experiment_motif_{k}_{i}.csv"
     with open(output_csv_filename, 'w') as f_out:
         f_out.write("name, bipartiteness, ci, fr1, fr2\n")
 
