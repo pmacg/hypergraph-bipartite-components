@@ -262,15 +262,15 @@ def migration_experiment():
     migration_dataset = datasets.MigrationDataset()
 
     hyplogging.logger.info("Running CLSZ algorithm.")
-    k = 2
+    k = 10
     clsz_labels = clsz.cluster.cluster_networkx(migration_dataset.directed_graph, k)
     hyplogging.logger.info(f'CLSZ labels: {" ".join(map(str, clsz_labels))}')
 
     # Now, run the hypergraph clustering algorithm
     hyplogging.logger.info("Running diffusion algorithm.")
-    i = 1
+    i = 4
     diff_clusters = hypalgorithms.recursive_bipartite_diffusion(migration_dataset.hypergraph, iterations=i,
-                                                                max_time=100, step_size=0.1,
+                                                                max_time=100, step_size=0.5,
                                                                 approximate=True)
 
     # Now, we will display the vitalstatistix of both algorithm.

@@ -25,7 +25,7 @@ class LightHypergraph(object):
         self.edges = edges
 
         self.num_edges = len(self.edges)
-        self.num_vertices = max(max(self.edges, key=max)) + 1
+        self.num_vertices = max(max(self.edges, key=max)) + 1 if len(self.edges) > 0 else 0
         self.nodes = list(range(self.num_vertices))
         self.neighbours = {node: set() for node in self.nodes}
 

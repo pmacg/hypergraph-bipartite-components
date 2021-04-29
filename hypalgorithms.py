@@ -105,15 +105,19 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
             induced_hypergraph = hypergraph.induced_hypergraph(cluster)
 
             # Run the diffusion on this hypergraph.
-            cluster_l, cluster_r, _ = find_bipartite_set_diffusion(induced_hypergraph, max_time=max_time,
-                                                                   step_size=step_size,
-                                                                   use_random_initialisation=use_random_initialisation,
-                                                                   approximate=approximate)
+            if induced_hypergraph.num_vertices > 0:
+                cluster_l, cluster_r, _ = find_bipartite_set_diffusion(induced_hypergraph, max_time=max_time,
+                                                                       step_size=step_size,
+                                                                       use_random_initialisation=use_random_initialisation,
+                                                                       approximate=approximate)
 
-            # Add the found clusters to the new list. Recall that the vertex indices in the induced hypergraph are
-            # equal to the vertex indices in the list 'cluster'.
-            new_clusters.append([cluster[v] for v in cluster_l])
-            new_clusters.append([cluster[v] for v in cluster_r])
+                # Add the found clusters to the new list. Recall that the vertex indices in the induced hypergraph are
+                # equal to the vertex indices in the list 'cluster'.
+                new_clusters.append([cluster[v] for v in cluster_l])
+                new_clusters.append([cluster[v] for v in cluster_r])
+            else:
+                # If the induced hypergraph does not have any edges, then we do not try to run the algorithm.
+                new_clusters.append(cluster)
 
         # Update the current clusters for the next iteration.
         current_clusters = new_clusters
