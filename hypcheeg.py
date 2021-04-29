@@ -164,7 +164,9 @@ def hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r):
             w_r_l += 1
 
     # Compute the bipartiteness
-    return (w_l_not_l + w_r_not_r + w_l_r + w_r_l) / vol_s
+    bipart = (w_l_not_l + w_r_not_r + w_l_r + w_r_l) / vol_s
+    hyplogging.logger.debug(f"Computed bipartiteness: {bipart}")
+    return bipart
 
 
 def hypergraph_sweep_set(x, hypergraph):

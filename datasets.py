@@ -49,8 +49,13 @@ class Dataset(object):
 
         with open(filename, 'r') as f_in:
             for line in f_in.readlines():
-                vertices = [int(x) + offset for x in re.split("[ ,\t]", line.strip())]
-                hypergraph_edges.append(vertices)
+                try:
+                    vertices = [int(x) + offset for x in re.split("[ ,\t]", line.strip())]
+                    hypergraph_edges.append(vertices)
+                except ValueError:
+                    # Assume that this is a header line which cannot be parsed. If you see lots of the following log
+                    # message then something has gone wrong.
+                    hyplogging.logger.info("Ignoring header line in edgelist.")
 
         # Construct and return the hypergraph
         return lightgraphs.LightHypergraph(hypergraph_edges)
@@ -360,7 +365,6 @@ class MigrationDataset(Dataset):
         hyplogging.logger.debug("Generating zipcodes.")
         self.zipcodes = self.get_migration_zipcodes()
 
-
     @staticmethod
     def get_migration_zipcodes():
         m = loadmat('data/migration/ALL_CENSUS_DATA_FEB_2015.mat')
@@ -384,3 +388,24 @@ class MigrationDataset(Dataset):
             zip_codes.append(zipcode)
 
         return zip_codes
+
+
+class WikipediaDataset(Dataset):
+    """
+    The wikipedia dataset.
+    """
+
+    def __init__(self, animal):
+        """
+        Load the dataset. Animal should be a string in ["chameleon", "crocodile", "squirrel"].
+        """
+        if animal not in ["chameleon", "crocodile", "squirrel"]:
+            raise AssertionError("Animal must be chameleon, crocodile or squirrel.")
+        self.animal = animal
+        super().__init__()
+
+    def load_data(self):
+        hyplogging.logger.info(f"Loading the wikipedia {self.animal} dataset.")
+        self.load_edgelist_and_labels(f"data/wikipedia/{self.animal}/musae_{self.animal}_edges.csv",
+                                      None, None, None, None)
+        self.is_loaded = True

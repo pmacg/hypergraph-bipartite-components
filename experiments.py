@@ -134,21 +134,31 @@ def test_step_sizes():
                             f_out.flush()
 
 
-def dataset_experiment(dataset):
+def dataset_experiment(dataset, step_size=1.0, max_time=100):
     """
     Run a test of our algorithm on a given dataset.
     """
     # Run the clique algorithm
     hyplogging.logger.info("Running the clique algorithm.")
     clique_alg_l, clique_alg_r, clique_bipart = hypalgorithms.find_bipartite_set_clique(dataset.hypergraph)
-    hyplogging.logger.info(f"Clique algorithm bipartiteness: {clique_bipart}\n")
+
+    # Run the random algorithm
+    hyplogging.logger.info("Running the random algorithm.")
+    rand_alg_l, rand_alg_r, rand_bipart = hypalgorithms.find_bipartite_set_random(dataset.hypergraph)
 
     # Run the diffusion algorithm
     hyplogging.logger.info("Running the diffusion algorithm.")
     diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(dataset.hypergraph,
-                                                                                     step_size=1, max_time=100,
-                                                                                     approximate=True)
-    hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
+                                                                                     step_size=step_size,
+                                                                                     max_time=max_time,
+                                                                                     approximate=True,
+                                                                                     use_random_initialisation=False)
+    rand_diff_alg_l, rand_diff_alg_r, rand_diff_bipart = hypalgorithms.find_bipartite_set_diffusion(
+        dataset.hypergraph, step_size=step_size, max_time=max_time, approximate=True, use_random_initialisation=True)
+    hyplogging.logger.info(f"Clique algorithm bipartiteness: {clique_bipart}")
+    hyplogging.logger.info(f"Random algorithm bipartiteness: {rand_bipart}")
+    hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipart}")
+    hyplogging.logger.info(f"Random diffusion algorithm bipartiteness: {rand_diff_bipart}")
 
 
 def foodweb_experiment():
@@ -283,5 +293,13 @@ def migration_experiment():
     log_migration_pairwise_results(output_csv_filename, migration_dataset, "Diffusion", diff_clusters)
 
 
+def wikipedia_experiment():
+    """Run the diffusion and related hypergraph algorithms on the three different wikipedia datasets."""
+    for animal in ["chameleon", "crocodile", "squirrel"]:
+        hyplogging.logger.info(f"NOW PROCESSING: {animal}")
+        wikipedia_dataset = datasets.WikipediaDataset(animal)
+        dataset_experiment(wikipedia_dataset, step_size=0.1)
+
+
 if __name__ == "__main__":
-    migration_experiment()
+    wikipedia_experiment()
