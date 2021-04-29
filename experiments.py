@@ -3,6 +3,7 @@ This file implements some experiments on the hypergraph diffusion operator.
 """
 import time
 import clsz.cluster
+import clsz.metrics
 import hypconstruct
 import hypalgorithms
 import hypcheeg
@@ -206,7 +207,7 @@ def log_migration_result(filename, migration_dataset, title, left_set, right_set
     hyplogging.logger.debug(f"    Left set: {str(left_set)}")
     hyplogging.logger.debug(f"   Right set: {str(right_set)}")
     bipartiteness = hypcheeg.hypergraph_bipartiteness(migration_dataset.hypergraph, left_set, right_set)
-    cut_imbalance = hypcheeg.clsz_cut_imbalance(migration_dataset.directed_graph, left_set, right_set)
+    cut_imbalance = clsz.metrics.networkx_cut_imbalance(migration_dataset.directed_graph, left_set, right_set)
     flow_ratio_left_right = hypcheeg.ms_flow_ratio(migration_dataset.directed_graph, left_set, right_set)
     flow_ratio_right_left = hypcheeg.ms_flow_ratio(migration_dataset.directed_graph, right_set, left_set)
     hyplogging.logger.info(f"{title}")
@@ -216,6 +217,39 @@ def log_migration_result(filename, migration_dataset, title, left_set, right_set
     hyplogging.logger.info(f"       Reversed Flow Ratio: {flow_ratio_right_left}")
     with open(filename, 'a') as f_out:
         f_out.write(f"{title}, {bipartiteness}, {cut_imbalance}, {flow_ratio_left_right}, {flow_ratio_right_left}\n")
+
+
+def log_migration_pairwise_results(filename, migration_dataset, title, clusters):
+    """
+    Given an array of cluster labels (clusters), log the objective values of every pairwise cluster in the set.
+
+    :param filename: the file to which the results will be written.
+    :param migration_dataset: the migration dataset object.
+    :param title: the overall title of the results
+    :param clusters: either a list of 0-indexed cluster labels, or a list of lists representing clusters
+    :return:
+    """
+    if type(clusters[0]) == list:
+        # Clusters is a list of lists
+        k = len(clusters)
+    else:
+        # Clusters is a list of cluster labels
+        k = max(clusters) + 1
+
+    for cluster_idx_1 in range(k):
+        for cluster_idx_2 in range(cluster_idx_1 + 1, k):
+            if type(clusters[0]) == list:
+                # Clusters is a list of lists
+                cluster_1 = clusters[cluster_idx_1]
+                cluster_2 = clusters[cluster_idx_2]
+            else:
+                # Clusters is a list of cluster labels
+                cluster_1 = [i for (i, label) in enumerate(clusters) if label == cluster_idx_1]
+                cluster_2 = [i for (i, label) in enumerate(clusters) if label == cluster_idx_2]
+
+            log_migration_result(filename, migration_dataset,
+                                 f"{title} Clusters {cluster_idx_1} and {cluster_idx_2}",
+                                 cluster_1, cluster_2)
 
 
 def migration_experiment():
@@ -234,27 +268,18 @@ def migration_experiment():
 
     # Now, run the hypergraph clustering algorithm
     hyplogging.logger.info("Running diffusion algorithm.")
-    diff_left, diff_right, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(migration_dataset.hypergraph,
-                                                                                    max_time=1, step_size=0.1,
-                                                                                    approximate=True)
-    hyplogging.logger.info(f"Diffusion left: {str(diff_left)}")
-    hyplogging.logger.info(f"Diffusion right: {str(diff_right)}")
+    diff_clusters = hypalgorithms.recursive_bipartite_diffusion(migration_dataset.hypergraph, iterations=1,
+                                                                max_time=100, step_size=0.1,
+                                                                approximate=True)
 
     # Now, we will display the vitalstatistix of both algorithm.
-    # For each pair of clusters in the CLSZ results, display the key results
     output_csv_filename = f"results/migration_experiment_motif_{k}.csv"
     with open(output_csv_filename, 'w') as f_out:
         f_out.write("name, bipartiteness, ci, fr1, fr2\n")
-    for cluster_idx_1 in range(k):
-        for cluster_idx_2 in range(cluster_idx_1 + 1, k):
-            cluster_1 = [i for (i, label) in enumerate(clsz_labels) if label == cluster_idx_1]
-            cluster_2 = [i for (i, label) in enumerate(clsz_labels) if label == cluster_idx_2]
-            log_migration_result(output_csv_filename, migration_dataset,
-                                 f"CLSZ Clusters {cluster_idx_1} and {cluster_idx_2}",
-                                 cluster_1, cluster_2)
 
-    # Now, print the results for the hypergraph diffusion algorithm
-    log_migration_result(output_csv_filename, migration_dataset, f"Diffusion Algorithm", diff_left, diff_right)
+    # Now, print the results
+    log_migration_pairwise_results(output_csv_filename, migration_dataset, "CLSZ", clsz_labels)
+    log_migration_pairwise_results(output_csv_filename, migration_dataset, "Diffusion", diff_clusters)
 
 
 if __name__ == "__main__":
