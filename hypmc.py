@@ -502,7 +502,7 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_di
                 prev_gts = [g_t[int((t - 10) / step)], g_t[int((t - 5) / step)], g_t[int((t - 1) / step)], this_gt]
                 diff = prev_gts[0] - this_gt
 
-                hyplogging.logger.debug(f"Convergence target = 0.0001; actual diff = {diff}")
+                hyplogging.logger.debug(f"Convergence target = 0.001; actual diff = {diff}")
 
                 if diff < 0.001:
                     # We have converged
