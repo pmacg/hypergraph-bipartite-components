@@ -409,3 +409,34 @@ class WikipediaDataset(Dataset):
         self.load_edgelist_and_labels(f"data/wikipedia/{self.animal}/musae_{self.animal}_edges.csv",
                                       None, None, None, None)
         self.is_loaded = True
+
+
+class MidDataset(Dataset):
+    """
+    The dataset object representing the dyadid MID dataset.
+    """
+
+    def __init__(self, start_date, end_date):
+        """
+        When constructing, pass the start and end dates for the data.
+
+        :param start_date:
+        :param end_date:
+        """
+        self.start_date = start_date
+        self.end_date = end_date
+        self.edgelist_filename = f"data/mid/dyadic_mid_{start_date}_{end_date}.edgelist"
+        self.graph = None
+        super().__init__()
+
+    def load_data(self):
+        """
+        Read the graph from the edgelist file. Construct a hypergraph by replacing triangles with 3-edges.
+        """
+        hyplogging.logger.info(f"Loading MID dataset from {self.edgelist_filename}")
+        self.graph = nx.read_edgelist(self.edgelist_filename, data=[("weight", int)])
+
+        # Now, construct the hypergraph from this by adding a hyperedge for every triangle
+        hyperedges = []
+
+        pass
