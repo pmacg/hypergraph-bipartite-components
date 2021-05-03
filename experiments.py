@@ -304,7 +304,7 @@ def wikipedia_experiment():
 def mid_experiment():
     """Run experiments with the MID dataset."""
     mid_dataset = datasets.MidDataset(1900, 1950)
-    simple_experiment(mid_dataset.graph_hypergraph)
+    simple_experiment(mid_dataset.hypergraph, step_size=0.1)
 
 
 if __name__ == "__main__":

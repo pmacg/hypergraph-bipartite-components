@@ -405,138 +405,281 @@ def graph_diffusion_operator(graph, normalised=False, weighted=False, unnormalis
         return sp.sparse.identity(n) + adjacency_matrix @ inverse_degree_matrix
 
 
+def compute_gt(varphi, hypergraph, measure_diffusion_operator):
+    """
+    Compute the value of the function g(t) given the measure vector varphi, the hypergraph and the diffusion operator at
+    this time step.
+
+    :param varphi:
+    :param hypergraph:
+    :param measure_diffusion_operator:
+    :return:
+    """
+    inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
+    return (varphi @ inverse_degree_matrix @ measure_diffusion_operator @ varphi) /\
+           (varphi @ measure_diffusion_operator @ varphi)
+
+
+def compute_ht(gts, step_size):
+    """Compute the value of h(t) = - d/dt g(t), given the list of gt values and the current step size."""
+    if len(gts) >= 2:
+        return (gts[-2] - gts[-1]) / step_size
+    else:
+        return 0
+
+
+def plot_convergence_graphs(t_steps, g_t):
+    """Plot the graphs illustrating the convergence of the diffusion process.
+
+    :param t_steps: the list of time steps used in the diffusion
+    :param g_t: the list of g_t values to go along with t_steps
+    """
+    # Create the axes
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+
+    # Label the axes
+    ax1.set_xlabel("t")
+    ax1.set_ylabel("F(t) or G(t)")
+    ax2.set_ylabel("- log F(t)")
+
+    # Plot the functions
+    line1 = ax1.plot(t_steps[:len(g_t)], g_t)
+
+    # Add legend and show plot
+    ax2.legend(line1, "G(t) = d/dt - log F(t)")
+    fig.tight_layout()
+    plt.show()
+
+
+def diffusion_has_converged(t_steps, gts):
+    """
+    Determine whether the diffusion process has converged, given a list of time steps and g(t) values.
+    :param t_steps:
+    :param gts:
+    :return: boolean indicating convergence
+    """
+    # If we have been running for more than 11 time steps
+    current_time = t_steps[-1]
+    if current_time >= 11:
+        # Get the value of g(t) for 10 time steps ago
+        t_minus_10_index = 0
+        for i, t in enumerate(t_steps):
+            if t < current_time - 10:
+                t_minus_10_index = i
+        previous_gt = gts[t_minus_10_index]
+        diff = previous_gt - gts[-1]
+
+        hyplogging.logger.debug(f"Convergence target = 0.001; actual diff = {diff}")
+
+        if diff < 0.001:
+            # We have converged
+            hyplogging.logger.info(f"Diffusion process has converged at time {t}")
+            return True
+    return False
+
+
+def approximate_measure_diffusion_operator(measure_vector, hypergraph):
+    """
+    Compute the approximate measure diffusion operator for the given measure vector and hypergraph.
+    :param measure_vector:
+    :param hypergraph:
+    :return:
+    """
+    # Apply the approximate diffusion operator. We construct the approximate reduced graph using the weighted
+    # vector f.
+    f = hyplap.measure_to_weighted(measure_vector, hypergraph)
+    approximate_diffusion_graph = hypreductions.hypergraph_approximate_diffusion_reduction(hypergraph, f)
+    inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
+    return graph_diffusion_operator(approximate_diffusion_graph, unnormalised=True) @ inverse_degree_matrix
+
+
+def approximate_diffusion_update_step(measure_vector, hypergraph, step_size):
+    """
+    Given a current measure vector, hypergraph and step size, perform an update step of the approximate diffusion
+    process.
+
+    Returns the values
+      - measure_vector
+      - g(t)
+      - f(t)
+      - -log(f(t))
+    :param measure_vector:
+    :param hypergraph:
+    :param step_size:
+    :return:
+    """
+    # Apply the approximate diffusion operator. We construct the approximate reduced graph using the weighted
+    # vector f.
+    diffusion_operator_measure = approximate_measure_diffusion_operator(measure_vector, hypergraph)
+    grad_hyp = - diffusion_operator_measure @ measure_vector
+    new_measure_vector = measure_vector + step_size * grad_hyp
+
+    # Add the graph points for this time step
+    inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
+    this_ft = new_measure_vector @ inverse_degree_matrix @ new_measure_vector
+    negative_log_ft = - math.log(this_ft)
+    x_tn = new_measure_vector / this_ft
+
+    # Approximate the value of this_gt using the matrices of the approximate induced graph
+    this_gt = compute_gt(x_tn, hypergraph, diffusion_operator_measure)
+
+    # Return all the key values
+    return new_measure_vector, this_gt, this_ft, negative_log_ft
+
+
+def diffusion_update_step(measure_vector, hypergraph, step_size):
+    """
+    Given the current measure vector, hypergraph and step size, perform an update step of the diffusion process.
+
+    Returns the values
+      - measure_vector
+      - g(t)
+      - f(t)
+      - -log(f(t))
+    :param measure_vector:
+    :param hypergraph:
+    :param step_size:
+    :return:
+    """
+    # Apply the diffusion operator
+    grad_hyp = -hypergraph_measure_mc_laplacian(measure_vector, hypergraph)
+    new_measure_vector = measure_vector + step_size * grad_hyp
+
+    # Compute the graph points for this time step
+    this_ft = new_measure_vector @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ new_measure_vector
+    negative_log_ft = - math.log(this_ft)
+    x_tn = new_measure_vector / this_ft
+    this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @
+               hypergraph_measure_mc_laplacian(x_tn, hypergraph)) / (
+                      x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
+
+    return new_measure_vector, this_gt, this_ft, negative_log_ft
+
+
+def choose_update_step_size(min_step, measure_vector, hypergraph):
+    """
+    Choose the optimal update step size for the given measure vector and hypergraph.
+    :param min_step:
+    :param measure_vector:
+    :param hypergraph:
+    :return:
+    """
+    hyplogging.logger.debug("Choosing a new step size.")
+    # Which step size options we will consider
+    options = [min_step, 2*min_step, 5*min_step, 10*min_step]
+
+    # If all step sizes result in a small negative decrease in g(t), take the largest step size
+    small_threshold = 0.0001
+    all_small_negative = True
+
+    # We will choose the step size which gives the best decrease in g(t) value for a single step.
+    best_step_size = None
+    best_gt_decrease = None
+    current_gt = compute_gt(measure_vector, hypergraph,
+                            approximate_measure_diffusion_operator(measure_vector, hypergraph))
+    for step in options:
+        # Perform an update step with this step size and check if it is the best
+        _, this_gt, _, _ = approximate_diffusion_update_step(measure_vector, hypergraph, step)
+        this_decrease = current_gt - this_gt
+        hyplogging.logger.debug(f"Step size {step} has decrease {this_decrease}")
+
+        if best_step_size is None or this_decrease > best_gt_decrease:
+            hyplogging.logger.debug("... which is the best so far!")
+            best_step_size = step
+            best_gt_decrease = this_decrease
+
+        if this_decrease > 0 or abs(this_decrease) > small_threshold:
+            all_small_negative = False
+
+    if all_small_negative:
+        hyplogging.logger.debug("Since all decreases are small and negative, we will use the largest step size.")
+        return options[-1]
+    return best_step_size
+
+
 # =======================================================
 # Simulate the max cut heat diffusion process
 # =======================================================
-def sim_mc_heat_diff(phi, hypergraph, max_time=1, step=0.1, debug=False, plot_diff=False,
-                     print_time=False, check_converged=False, approximate=False):
+def sim_mc_heat_diff(phi, hypergraph, max_time=1, min_step=0.1, debug=False, plot_diff=False,
+                     check_converged=False, approximate=False, adaptive_step_size=True):
     """
     Simulate the heat diffusion process for the hypergraph max cut operator.
     :param phi: The measure vector at the start of the process
     :param hypergraph: The underlying hypergraph
     :param max_time: The end time of the process
-    :param step: The time interval to use for each step
+    :param min_step: The time interval to use for each step
     :param debug: Whether to print debug statements
     :param plot_diff: Whether to plot graphs showing the progression of the diffusion
-    :param print_time: Whether to print the time steps
     :param check_converged: Whether to check for convergence of G(t)
     :param approximate: Whether to use the approximate no-LP version of the diffusion operator
+    :param adaptive_step_size: Whether to vary the step size to shorted convergence time
     :return: A measure vector at the end of the process, the final time of the diffusion process, the sequence of G(T)
     """
     hyplogging.logger.info(f"Beginning heat diffusion process.")
     hyplogging.logger.info(f"   max_time        = {max_time}")
-    hyplogging.logger.info(f"   step            = {step}")
+    hyplogging.logger.info(f"   min_step        = {min_step}")
     hyplogging.logger.info(f"   approximate     = {approximate}")
     hyplogging.logger.info(f"   check_converged = {check_converged}")
+
     # If we are going to plot the diffusion process, we will show the following quantities:
     #  F(t) = \phi_t D^{-1} \phi_t
     #  - log F(t)
     #  G(t) = d/dt - log F(t)
     #  h(t) = - d/dt G(t)
-    t_steps = np.linspace(0, max_time, int(max_time / step))
+    t_steps = []
     f_t = []
     negative_log_ft = []
     g_t = []
     h_t = []
 
+    # We may vary the step size, but we will start with the minimum one given
+    step_size = min_step
+
     x_t = phi
     final_t = 0
-    for t in t_steps:
-        final_t = t
-        if print_time:
-            print(f"Time {t:.2f}")
+    steps_since_choosing_size = 0
+    steps_before_choosing_size = 1
+    t = 0
+    while t < max_time:
+        steps_since_choosing_size += 1
+        t_steps.append(t)
 
-        # Computing G(t) - when we are approximating the diffusion process, the numerator may not be a nice, positive
-        # semi-definite matrix.
+        # Update the step size every 10 steps
+        if adaptive_step_size and steps_since_choosing_size > steps_before_choosing_size:
+            old_step_size = step_size
+            step_size = choose_update_step_size(min_step, x_t, hypergraph)
+            steps_since_choosing_size = 0
+
+            # If we have kept the same size, increase the steps to wait before checking
+            if step_size == old_step_size:
+                steps_before_choosing_size += max(2, int(0.4 * steps_before_choosing_size))
+            else:
+                steps_before_choosing_size = 1
+            hyplogging.logger.debug(f"Number of steps before checking size again: {steps_before_choosing_size}")
+        t += step_size
+
+        # Apply an update step of the diffusion process
         if not approximate:
-            # Apply the diffusion operator
-            grad_hyp = -hypergraph_measure_mc_laplacian(x_t, hypergraph, debug=debug, approximate=approximate)
-            x_t += step * grad_hyp
-
-            # Add the graph points for this time step
-            this_ft = x_t @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ x_t
-            f_t.append(this_ft)
-            negative_log_ft.append(- math.log(this_ft))
-            x_tn = x_t / this_ft
-
-            this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @
-                       hypergraph_measure_mc_laplacian(x_tn, hypergraph)) / (
-                    x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
+            new_xt, this_gt, this_ft, this_negative_log_ft = diffusion_update_step(x_t, hypergraph, step_size)
         else:
-            # Apply the approximate diffusion operator. We construct the approximate reduced graph using the weighted
-            # vector f.
-            f = hyplap.measure_to_weighted(x_t, hypergraph)
-            approximate_diffusion_graph = hypreductions.hypergraph_approximate_diffusion_reduction(hypergraph, f)
-            inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
-            diffusion_operator_measure = graph_diffusion_operator(approximate_diffusion_graph, unnormalised=True) @\
-                inverse_degree_matrix
+            new_xt, this_gt, this_ft, this_negative_log_ft = approximate_diffusion_update_step(
+                x_t, hypergraph, step_size)
 
-            # We apply the measure operator directly to the measure vector x_t
-            grad_hyp = - diffusion_operator_measure @ x_t
-            x_t += step * grad_hyp
-
-            # Add the graph points for this time step
-            this_ft = x_t @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ x_t
-            f_t.append(this_ft)
-            negative_log_ft.append(- math.log(this_ft))
-            x_tn = x_t / this_ft
-
-            # Approximate the value of this_gt using the matrices of the approximate induced graph
-            this_gt = (x_tn @ inverse_degree_matrix @ diffusion_operator_measure @ x_tn) /\
-                      (x_tn @ inverse_degree_matrix @ x_tn)
+        x_t = new_xt
+        f_t.append(this_ft)
+        negative_log_ft.append(this_negative_log_ft)
         g_t.append(this_gt)
-        if len(g_t) > 2:
-            h_t.append((g_t[-2] - g_t[-1]) / step)
-        elif len(g_t) == 2:
-            h_t.append((g_t[-2] - g_t[-1]) / step)
-            h_t.append((g_t[-2] - g_t[-1]) / step)
-
+        h_t.append(compute_ht(g_t, step_size))
         hyplogging.logger.debug(f"time: {t}; g_t: {this_gt}")
 
         # Check for convergence
-        if check_converged:
-            gt_len = len(g_t)
-            if gt_len >= 11 / step:
-                # If we have gone for at least 11 time steps.
-                # Get the values of g(t) for 10 time steps ago, 5 time steps ago and 1 time step ago
-                prev_gts = [g_t[int((t - 10) / step)], g_t[int((t - 5) / step)], g_t[int((t - 1) / step)], this_gt]
-                diff = prev_gts[0] - this_gt
-
-                hyplogging.logger.debug(f"Convergence target = 0.001; actual diff = {diff}")
-
-                if diff < 0.001:
-                    # We have converged
-                    hyplogging.logger.info(f"Diffusion process has converged at time {t}")
-                    break
-
-    # Print the final value of G(t). If the process is fully converged, then this is an eigenvalue of the hypergraph
-    # laplacian operator.
-    this_ft = x_t @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ x_t
-    x_tn = x_t / this_ft
-    final_gt = (x_tn @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @
-                hypergraph_measure_mc_laplacian(x_tn, hypergraph, approximate=approximate)) / (
-            x_tn @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ x_tn)
-    if print_time:
-        print(f"Final value of G(t): {final_gt:.5f}")
+        if check_converged and diffusion_has_converged(t_steps, g_t):
+            break
 
     # Now, plot the graphs
     if plot_diff:
-        # Create the axes
-        fig, ax1 = plt.subplots()
-        ax2 = ax1.twinx()
-
-        # Label the axes
-        ax1.set_xlabel("t")
-        ax1.set_ylabel("F(t) or G(t)")
-        ax2.set_ylabel("- log F(t)")
-
-        # Plot the functions
-        line1 = ax1.plot(t_steps[:len(g_t)], g_t)
-
-        # Add legend and show plot
-        ax2.legend(line1, "G(t) = d/dt - log F(t)")
-        fig.tight_layout()
-        plt.show()
+        plot_convergence_graphs(t_steps, g_t)
 
     return x_t, final_t, g_t
 
@@ -559,9 +702,7 @@ def check_random_2_color_graph(n, m, r, t, eps):
     s[1] = 1
 
     # Run the heat diffusion process
-    _, final_t, g_sequence = sim_mc_heat_diff(s, random_hypergraph, t,
-                                              step=eps,
-                                              check_converged=True)
+    _, final_t, g_sequence = sim_mc_heat_diff(s, random_hypergraph, t, min_step=eps, check_converged=True)
 
     # Return the result
     g_length = len(g_sequence)

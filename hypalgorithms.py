@@ -19,9 +19,8 @@ def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_si
     :return: the sets L and R, and their bipartiteness
     """
     # Compute the diffusion process until convergence
-    measure_vector, _, _ = hypmc.sim_mc_heat_diff(
-        starting_vector, hypergraph, max_time=max_time, step=step_size, check_converged=True, plot_diff=False,
-        approximate=approximate)
+    measure_vector, _, _ = hypmc.sim_mc_heat_diff(starting_vector, hypergraph, max_time=max_time, min_step=step_size,
+                                                  plot_diff=False, check_converged=True, approximate=approximate)
 
     # Perform the sweep set algorithm on the measure vector to find the almost-bipartite set
     vertex_set_l, vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(measure_vector, hypergraph)
