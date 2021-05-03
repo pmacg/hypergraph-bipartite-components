@@ -490,6 +490,70 @@ class MidDataset(Dataset):
                         pass
         return lightgraphs.LightHypergraph(hyperedges)
 
+    def get_motif_hyperedges(self, u, v, w, x):
+        """Helper method for constructing the motif hypergraph. Given the vertices u, v, w, x, return a list of the
+        hyperedges that should be added to the graph."""
+        new_hyperedges = []
+
+        def add_split_hyperedges(a, b, c, d):
+            if b not in self.graph.adj[a] and d not in self.graph.adj[c]:
+                try:
+                    weight = min(self.graph.adj[a][c]['weight'],
+                                 self.graph.adj[a][d]['weight'],
+                                 self.graph.adj[b][c]['weight'],
+                                 self.graph.adj[b][d]['weight'])
+                    for i in range(int(weight)):
+                        new_hyperedges.append([self.original_vertex_to_new[a],
+                                               self.original_vertex_to_new[b],
+                                               self.original_vertex_to_new[c],
+                                               self.original_vertex_to_new[d]])
+                except KeyError:
+                    pass
+
+        # There are 3 partitions of (u, v, w, x) to consider
+        add_split_hyperedges(u, v, w, x)
+        add_split_hyperedges(u, w, v, x)
+        add_split_hyperedges(u, x, v, w)
+
+        return new_hyperedges
+
+    def check_motif_3_vertices(self, u, v, w):
+        """Given three vertices, check whether they could possibly form part of a motif for the motif hypergraph."""
+        # The key thing to check is that there are exactly 2 non-zero edges between these vertices.
+        num_edges = 0
+        if v in self.graph.adj[u]:
+            num_edges += 1
+        if w in self.graph.adj[u]:
+            num_edges += 1
+        if w in self.graph.adj[v]:
+            num_edges += 1
+        return num_edges == 2
+
+    def construct_bipartite_motif_hypergraph(self):
+        """Look for the following motif in the graph, and add corresponding hyperedges:
+            - vertices u, v, w, x
+            - edges u-w, u-x, v-w, v-x
+            - no edges u-v, w-x
+        """
+        if self.graph_hypergraph is None:
+            raise AssertionError("Must construct simple hypergraph before constructing motif hypergraph.")
+
+        # Now, add edges for each motif
+        hyperedges = self.graph_hypergraph.edges.copy()
+        all_nodes = list(self.graph.nodes)
+        for a in range(len(all_nodes)):
+            hyplogging.logger.debug(f"Checking edges from vertex {a}/{len(all_nodes)}")
+            u = all_nodes[a]
+            for b in range(a + 1, len(all_nodes)):
+                v = all_nodes[b]
+                for c in range(b + 1, len(all_nodes)):
+                    w = all_nodes[c]
+                    if self.check_motif_3_vertices(u, v, w):
+                        for d in range(c + 1, len(all_nodes)):
+                            x = all_nodes[d]
+                            hyperedges.extend(self.get_motif_hyperedges(u, v, w, x))
+        return lightgraphs.LightHypergraph(hyperedges)
+
     def load_data(self):
         """
         Read the graph from the edgelist file. Construct a hypergraph by replacing triangles with 3-edges.
@@ -503,4 +567,4 @@ class MidDataset(Dataset):
 
         # Now construct the hypergraphs from this graph
         self.graph_hypergraph = self.construct_simple_hypergraph()
-        self.hypergraph = self.construct_triangle_hypergraph()
+        self.hypergraph = self.construct_bipartite_motif_hypergraph()

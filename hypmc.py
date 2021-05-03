@@ -621,6 +621,7 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, min_step=0.1, debug=False, plo
     hyplogging.logger.info(f"   min_step        = {min_step}")
     hyplogging.logger.info(f"   approximate     = {approximate}")
     hyplogging.logger.info(f"   check_converged = {check_converged}")
+    hyplogging.logger.info(f"adaptive_step_size = {adaptive_step_size}")
 
     # If we are going to plot the diffusion process, we will show the following quantities:
     #  F(t) = \phi_t D^{-1} \phi_t

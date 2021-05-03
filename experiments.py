@@ -303,8 +303,18 @@ def wikipedia_experiment():
 
 def mid_experiment():
     """Run experiments with the MID dataset."""
-    mid_dataset = datasets.MidDataset(1900, 1950)
-    simple_experiment(mid_dataset.hypergraph, step_size=0.1)
+    mid_dataset = datasets.MidDataset(1990, 2010)
+
+    # For this experiment, we will compare the performance of the diffusion algorithm on the motif-hypergraph to the
+    # clique algorithm (trevisan's algorithm) on the original graph.
+    clique_l, clique_r, _ = hypalgorithms.find_bipartite_set_clique(mid_dataset.graph_hypergraph)
+    diff_l, diff_r, _ = hypalgorithms.find_bipartite_set_diffusion(mid_dataset.hypergraph, approximate=True)
+
+    # Compute the objectives
+    clique_bipartiteness = hypcheeg.hypergraph_bipartiteness(mid_dataset.graph_hypergraph, clique_l, clique_r)
+    diff_bipartiteness = hypcheeg.hypergraph_bipartiteness(mid_dataset.graph_hypergraph, diff_l, diff_r)
+    hyplogging.logger.info(f"Trevisan's algorithm bipartiteness: {clique_bipartiteness}")
+    hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipartiteness}")
 
 
 if __name__ == "__main__":
