@@ -160,7 +160,7 @@ def hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r):
             w_r_not_r += 1
         if edge_l_intersection > 0 and not edge_r_intersection > 0:
             w_l_r += 1
-        if edge_r_intersection > 0 and not edge_r_intersection > 0:
+        if edge_r_intersection > 0 and not edge_l_intersection > 0:
             w_r_l += 1
 
     # Compute the bipartiteness

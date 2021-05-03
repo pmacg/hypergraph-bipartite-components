@@ -413,7 +413,7 @@ class WikipediaDataset(Dataset):
 
 class MidDataset(Dataset):
     """
-    The dataset object representing the dyadid MID dataset.
+    The dataset object representing the dyadic MID dataset.
     """
 
     def __init__(self, start_date, end_date):
@@ -426,8 +426,15 @@ class MidDataset(Dataset):
         self.start_date = start_date
         self.end_date = end_date
         self.edgelist_filename = f"data/mid/dyadic_mid_{start_date}_{end_date}.edgelist"
+
+        # The graph, graph_hypergraph and hypergraph objects will all have the same vertex set.
         self.graph = None
         self.graph_hypergraph = None
+
+        # Store the mapping from the original vertex numbering to the number in the new vertex set
+        self.new_vertex_to_original = {}
+        self.original_vertex_to_new = {}
+
         super().__init__()
 
     def construct_simple_hypergraph(self):
@@ -437,10 +444,22 @@ class MidDataset(Dataset):
 
         # Add a hyperedge for every edge
         hyperedges = []
+        next_new_index = 0
         for u, v, weight in self.graph.edges.data("weight"):
             if weight is not None:
+                # Check that we have assigned indexes for both u and v
+                if u not in self.original_vertex_to_new:
+                    self.original_vertex_to_new[u] = next_new_index
+                    self.new_vertex_to_original[next_new_index] = u
+                    next_new_index += 1
+                if v not in self.original_vertex_to_new:
+                    self.original_vertex_to_new[v] = next_new_index
+                    self.new_vertex_to_original[next_new_index] = v
+                    next_new_index += 1
+
+                # Now, add the hyperedges with the new indices.
                 for j in range(int(weight)):
-                    hyperedges.append([int(u), int(v)])
+                    hyperedges.append([self.original_vertex_to_new[u], self.original_vertex_to_new[v]])
         return lightgraphs.LightHypergraph(hyperedges)
 
     def construct_triangle_hypergraph(self):
@@ -464,7 +483,9 @@ class MidDataset(Dataset):
                                      self.graph.adj[u][w]['weight'],
                                      self.graph.adj[v][w]['weight'])
                         for i in range(int(weight)):
-                            hyperedges.append([int(u), int(v), int(w)])
+                            hyperedges.append([self.original_vertex_to_new[u],
+                                               self.original_vertex_to_new[v],
+                                               self.original_vertex_to_new[w]])
                     except KeyError:
                         pass
         return lightgraphs.LightHypergraph(hyperedges)
@@ -474,6 +495,12 @@ class MidDataset(Dataset):
         Read the graph from the edgelist file. Construct a hypergraph by replacing triangles with 3-edges.
         """
         hyplogging.logger.info(f"Loading MID dataset from {self.edgelist_filename}")
-        self.graph = nx.read_edgelist(self.edgelist_filename, data=[("weight", int)])
+
+        # Construct a networkx graph from the edgelist, and extract the largest connected component.
+        full_graph = nx.read_edgelist(self.edgelist_filename, data=[("weight", int)])
+        connected_components = sorted(nx.connected_components(full_graph), key=len, reverse=True)
+        self.graph = full_graph.subgraph(connected_components[0])
+
+        # Now construct the hypergraphs from this graph
         self.graph_hypergraph = self.construct_simple_hypergraph()
         self.hypergraph = self.construct_triangle_hypergraph()
