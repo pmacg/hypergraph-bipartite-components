@@ -5,4 +5,5 @@ scipy~=1.5.4
 networkx~=2.5
 pandas
 clsz==0.2.0
+pycheeg==0.1.0
 uszipcode

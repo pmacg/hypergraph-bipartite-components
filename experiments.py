@@ -304,6 +304,7 @@ def wikipedia_experiment():
 def mid_experiment():
     """Run experiments with the MID dataset."""
     mid_dataset = datasets.MidDataset(1900, 1950)
+    dataset_experiment(mid_dataset)
 
 
 if __name__ == "__main__":

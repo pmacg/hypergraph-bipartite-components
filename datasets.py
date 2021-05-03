@@ -427,7 +427,47 @@ class MidDataset(Dataset):
         self.end_date = end_date
         self.edgelist_filename = f"data/mid/dyadic_mid_{start_date}_{end_date}.edgelist"
         self.graph = None
+        self.graph_hypergraph = None
         super().__init__()
+
+    def construct_simple_hypergraph(self):
+        """Using the networkx graph object constructed in self.graph, construct a corresponding simple hypergraph."""
+        if self.graph is None:
+            raise AssertionError("Must construct networkx graph before simple hypergraph.")
+
+        # Add a hyperedge for every edge
+        hyperedges = []
+        for u, v, weight in self.graph.edges.data("weight"):
+            if weight is not None:
+                for j in range(int(weight)):
+                    hyperedges.append([int(u), int(v)])
+        return lightgraphs.LightHypergraph(hyperedges)
+
+    def construct_triangle_hypergraph(self):
+        """Assuming that the simple graph hypergraph has been constructed, construct the triangle motif hypergraph."""
+        if self.graph_hypergraph is None:
+            raise AssertionError("Must construct simple hypergraph before constructing triangle hypergraph.")
+
+        # Now, add edges for each triangle
+        hyperedges = self.graph_hypergraph.edges.copy()
+        all_nodes = list(self.graph.nodes)
+        for a in range(len(all_nodes)):
+            for b in range(a + 1, len(all_nodes)):
+                for c in range(b + 1, len(all_nodes)):
+                    u = all_nodes[a]
+                    v = all_nodes[b]
+                    w = all_nodes[c]
+
+                    # Check for a triangle
+                    try:
+                        weight = min(self.graph.adj[u][v]['weight'],
+                                     self.graph.adj[u][w]['weight'],
+                                     self.graph.adj[v][w]['weight'])
+                        for i in range(int(weight)):
+                            hyperedges.append([int(u), int(v), int(w)])
+                    except KeyError:
+                        pass
+        return lightgraphs.LightHypergraph(hyperedges)
 
     def load_data(self):
         """
@@ -435,8 +475,5 @@ class MidDataset(Dataset):
         """
         hyplogging.logger.info(f"Loading MID dataset from {self.edgelist_filename}")
         self.graph = nx.read_edgelist(self.edgelist_filename, data=[("weight", int)])
-
-        # Now, construct the hypergraph from this by adding a hyperedge for every triangle
-        hyperedges = []
-
-        pass
+        self.graph_hypergraph = self.construct_simple_hypergraph()
+        self.hypergraph = self.construct_triangle_hypergraph()
