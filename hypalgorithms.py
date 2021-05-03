@@ -41,6 +41,11 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
     :param approximate: Whether to use the approximate, no-LP version of the diffusion operator
     :return: the sets L, and R, and the bipartiteness value beta(L, R)
     """
+    # If the hypergraph does not contain any nodes, then just return empty sets
+    if len(hypergraph.nodes) == 0:
+        hyplogging.logger.debug("Hypergraph is empty, returning empty sets.")
+        return [], [], 1
+
     if use_random_initialisation:
         # We will run the diffusion process 5 times, starting from a different random starting vector each time.
         best_bipartiteness = 1
@@ -78,6 +83,66 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
         return _internal_bipartite_diffusion(s, hypergraph, max_time, step_size, approximate)
 
 
+def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algorithm="diffusion"):
+    """
+    Use the specified algorithm to find a partitioning of the vertices into two sets. Run the algorithm recursively
+    until the vertices are fully partitioned (similar to trevisan's algorithm).
+
+    :param hypergraph:
+    :param max_time:
+    :param step_size:
+    :param approximate:
+    :param algorithm: one of 'diffusion' or 'clique'
+    :return:
+    """
+    left_set = []
+    right_set = []
+    unclassified_nodes = hypergraph.nodes
+    n = len(unclassified_nodes)
+
+    while len(unclassified_nodes) > 0:
+        hyplogging.logger.debug(f"Max cut iteration. Nodes left: {len(unclassified_nodes)}/{n}")
+        # Run the next iteration of the algorithm.
+        induced_hypergraph = hypergraph.induced_hypergraph(unclassified_nodes)
+
+        if algorithm == 'diffusion':
+            new_l, new_r, _ = find_bipartite_set_diffusion(induced_hypergraph, max_time=max_time, step_size=step_size,
+                                                           approximate=approximate)
+        elif algorithm == 'clique':
+            new_l, new_r, _ = find_bipartite_set_clique(induced_hypergraph)
+        else:
+            raise AssertionError("Algorithm must be diffusion or clique.")
+
+        # If the returned sets are empty, we cannot continue other than adding all remaining vertices to one of the sets
+        if len(new_l) == 0 and len(new_r) == 0:
+            left_set.extend(unclassified_nodes)
+            break
+
+        # Figure out which way round to put the new sets
+        possible_left_set = left_set.copy()
+        possible_left_set.extend([unclassified_nodes[i] for i in new_l])
+        possible_right_set = right_set.copy()
+        possible_right_set.extend([unclassified_nodes[i] for i in new_r])
+        same_bipartiteness = hypcheeg.hypergraph_bipartiteness(hypergraph, possible_left_set, possible_right_set)
+
+        possible_left_set = left_set.copy()
+        possible_left_set.extend([unclassified_nodes[i] for i in new_r])
+        possible_right_set = right_set.copy()
+        possible_right_set.extend([unclassified_nodes[i] for i in new_l])
+        opposite_bipartiteness = hypcheeg.hypergraph_bipartiteness(hypergraph, possible_left_set, possible_right_set)
+
+        if same_bipartiteness < opposite_bipartiteness:
+            left_set.extend([unclassified_nodes[i] for i in new_l])
+            right_set.extend([unclassified_nodes[i] for i in new_r])
+        else:
+            left_set.extend([unclassified_nodes[i] for i in new_r])
+            right_set.extend([unclassified_nodes[i] for i in new_l])
+
+        # Update the list of nodes yet to be classified.
+        unclassified_nodes = [i for i in hypergraph.nodes if i not in left_set and i not in right_set]
+    return left_set, right_set
+
+
 def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_size=0.1, use_random_initialisation=False,
                                   approximate=False):
     """
@@ -105,10 +170,9 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
 
             # Run the diffusion on this hypergraph.
             if induced_hypergraph.num_vertices > 0:
-                cluster_l, cluster_r, _ = find_bipartite_set_diffusion(induced_hypergraph, max_time=max_time,
-                                                                       step_size=step_size,
-                                                                       use_random_initialisation=use_random_initialisation,
-                                                                       approximate=approximate)
+                cluster_l, cluster_r, _ = find_bipartite_set_diffusion(
+                    induced_hypergraph, max_time=max_time, step_size=step_size,
+                    use_random_initialisation=use_random_initialisation, approximate=approximate)
 
                 # Add the found clusters to the new list. Recall that the vertex indices in the induced hypergraph are
                 # equal to the vertex indices in the list 'cluster'.
@@ -130,6 +194,10 @@ def find_bipartite_set_clique(hypergraph):
     :param hypergraph: The hypergraph on which to operate
     :return: the sets L and R, and the bipartiteness value beta(L, R)
     """
+    # If the given hypergraph is empty, return empty sets
+    if len(hypergraph.nodes) == 0:
+        return [], [], 1
+
     # Construct the clique graph from the hypergraph
     hyplogging.logger.debug("Constructing the clique graph.")
     weighted_clique_graph = hypreductions.hypergraph_clique_reduction(hypergraph)
