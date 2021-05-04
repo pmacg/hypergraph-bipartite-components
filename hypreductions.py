@@ -103,7 +103,7 @@ def hypergraph_clique_reduction(hypergraph):
         rank = len(edge)
         new_weight = 1 / (rank - 1) if rank > 1 else 0
         for vertex_index_1 in range(rank):
-            for vertex_index_2 in range(vertex_index_1, rank):
+            for vertex_index_2 in range(vertex_index_1 + 1, rank):
                 adj_mat[edge[vertex_index_1], edge[vertex_index_2]] += new_weight
                 adj_mat[edge[vertex_index_2], edge[vertex_index_1]] += new_weight
 
