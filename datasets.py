@@ -108,6 +108,27 @@ class Dataset(object):
         self.vertex_labels = self.load_list_from_file(vertex_labels)
         self.edge_labels = self.load_list_from_file(edge_labels)
 
+    def log_two_sets(self, left_set, right_set):
+        """
+        Print two sets of vertices, using the vertex name if available.
+        :param left_set:
+        :param right_set:
+        :return:
+        """
+        if self.vertex_labels is None:
+            hyplogging.logger.info(f" Left Set: {left_set}")
+            hyplogging.logger.info(f"Right Set: {right_set}")
+        else:
+            max_items = max(len(left_set), len(right_set))
+            max_item_length = max(map(len, [self.vertex_labels[i] for i in left_set + right_set])) + 2
+            hyplogging.logger.info(f"{'Left Set': ^{max_item_length}}|{'Right Set': ^{max_item_length}}")
+            hyplogging.logger.info(f"{'-' * max_item_length}|{'-' * max_item_length}")
+            for i in range(max_items):
+                left_vertex_name = self.vertex_labels[left_set[i]] if i < len(left_set) else ''
+                right_vertex_name = self.vertex_labels[right_set[i]] if i < len(right_set) else ''
+                hyplogging.logger.info(
+                    f"{left_vertex_name: ^{max_item_length}}|{right_vertex_name: ^{max_item_length}}")
+
     def load_data(self):
         """
         Load the dataset.
@@ -408,6 +429,20 @@ class WikipediaDataset(Dataset):
         hyplogging.logger.info(f"Loading the wikipedia {self.animal} dataset.")
         self.load_edgelist_and_labels(f"data/wikipedia/{self.animal}/musae_{self.animal}_edges.csv",
                                       None, None, None, None)
+        self.is_loaded = True
+
+
+class WikipediaCategoriesDataset(Dataset):
+    """
+    The wikipedia categories dataset.
+    """
+
+    def load_data(self):
+        hyplogging.logger.info(f"Loading the wikipedia categories dataset.")
+        self.load_edgelist_and_labels("data/wikipedia-categories/categories.edgelist",
+                                      "data/wikipedia-categories/categories.vertices",
+                                      "data/wikipedia-categories/categories.edges",
+                                      None, None)
         self.is_loaded = True
 
 

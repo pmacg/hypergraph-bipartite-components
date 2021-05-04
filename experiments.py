@@ -153,8 +153,11 @@ def simple_experiment(hypergraph, step_size=0.1, max_time=100):
                                                                                      max_time=max_time,
                                                                                      approximate=True,
                                                                                      use_random_initialisation=False)
+
+    hyplogging.logger.info("Running the random diffusion algorithm.")
     rand_diff_alg_l, rand_diff_alg_r, rand_diff_bipart = hypalgorithms.find_bipartite_set_diffusion(
         hypergraph, step_size=step_size, max_time=max_time, approximate=True, use_random_initialisation=True)
+
     hyplogging.logger.info(f"Clique algorithm bipartiteness: {clique_bipart}")
     hyplogging.logger.info(f"Random algorithm bipartiteness: {rand_bipart}")
     hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipart}")
@@ -317,5 +320,17 @@ def mid_experiment():
     hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipartiteness}")
 
 
+def wikipedia_categories_experiment():
+    """Run experiments on the wikipedia categories dataset."""
+    categories_dataset = datasets.WikipediaCategoriesDataset()
+
+    # Run the diffusion algorithm
+    left_set, right_set, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(categories_dataset.hypergraph,
+                                                                                    approximate=True)
+
+    # Show the left and right set.
+    categories_dataset.log_two_sets(left_set, right_set)
+
+
 if __name__ == "__main__":
-    mid_experiment()
+    wikipedia_categories_experiment()
