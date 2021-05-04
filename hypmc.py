@@ -417,7 +417,7 @@ def compute_gt(varphi, hypergraph, measure_diffusion_operator):
     """
     inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
     return (varphi @ inverse_degree_matrix @ measure_diffusion_operator @ varphi) /\
-           (varphi @ measure_diffusion_operator @ varphi)
+           (varphi @ inverse_degree_matrix @ varphi)
 
 
 def compute_ht(gts, step_size):
