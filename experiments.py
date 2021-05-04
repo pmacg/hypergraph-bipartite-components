@@ -333,4 +333,4 @@ def wikipedia_categories_experiment():
 
 
 if __name__ == "__main__":
-    wikipedia_categories_experiment()
+    wikipedia_experiment()
