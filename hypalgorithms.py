@@ -152,7 +152,7 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
 
 
 def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_size=0.1, use_random_initialisation=False,
-                                  approximate=False):
+                                  approximate=False, return_unclassified=False):
     """
     Run the bipartite diffusion process recursively, to return 2^iterations clusters. The remaining arguments have the
     same meaning as in the find_bipartite_set_diffusion method.
@@ -163,6 +163,8 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
     :param step_size:
     :param use_random_initialisation:
     :param approximate:
+    :param return_unclassified: Whether to treat the 'unclassified' set as a cluster in each iteration (i.e. return 3
+                                clusters per iteration.
     :return: a list of lists containing the final clusters
     """
     current_clusters = [hypergraph.nodes]
@@ -186,6 +188,9 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
                 # equal to the vertex indices in the list 'cluster'.
                 new_clusters.append([cluster[v] for v in cluster_l])
                 new_clusters.append([cluster[v] for v in cluster_r])
+                if return_unclassified:
+                    new_clusters.append(
+                        [cluster[v] for v in range(len(cluster)) if v not in cluster_l and v not in cluster_r])
             else:
                 # If the induced hypergraph does not have any edges, then we do not try to run the algorithm.
                 new_clusters.append(cluster)
@@ -193,7 +198,8 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
         # Update the current clusters for the next iteration.
         current_clusters = new_clusters
 
-    return current_clusters
+    # Return the non-empty clusters
+    return [cluster for cluster in current_clusters if len(cluster) > 0]
 
 
 def find_bipartite_set_clique(hypergraph):

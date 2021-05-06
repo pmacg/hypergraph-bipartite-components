@@ -173,17 +173,17 @@ def foodweb_experiment():
     hyplogging.logger.info("Running the diffusion process on the foodweb graph.")
     clusters = hypalgorithms.recursive_bipartite_diffusion(foodweb_dataset.hypergraph, 4,
                                                            step_size=1, max_time=100,
-                                                           approximate=True)
+                                                           approximate=True, return_unclassified=True)
 
     for i, cluster in enumerate(clusters):
-        print()
-        print(f"Cluster {i + 1}")
+        hyplogging.logger.info("")
+        hyplogging.logger.info(f"Cluster {i + 1}")
         for index in cluster:
             vertex_name = foodweb_dataset.vertex_labels[index]
             vertex_cluster = foodweb_dataset.cluster_labels[foodweb_dataset.gt_clusters[index]] if \
                 foodweb_dataset.gt_clusters[index] is not None else 'missing'
-            print(f"{vertex_name}\t\t{vertex_cluster}")
-        print()
+            hyplogging.logger.info(f"{vertex_name}\t\t{vertex_cluster}")
+        hyplogging.logger.info("")
 
 
 def imdb_experiment():
@@ -350,14 +350,15 @@ def dblp_experiment():
 
     # Run the diffusion algorithm
     clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=3, approximate=True)
+    dblp_dataset.log_multiple_clusters(clusters)
 
-    for i, cluster in enumerate(clusters):
-        print()
-        hyplogging.logger.info(f"Cluster {i + 1}")
-        for index in cluster:
-            vertex_name = dblp_dataset.vertex_labels[index]
-            hyplogging.logger.info(f"{vertex_name}")
-        print()
+    # for i, cluster in enumerate(clusters):
+    #     hyplogging.logger.info("")
+    #     hyplogging.logger.info(f"Cluster {i + 1}")
+    #     for index in cluster:
+    #         vertex_name = dblp_dataset.vertex_labels[index]
+    #         hyplogging.logger.info(f"{vertex_name}")
+    #     hyplogging.logger.info("")
 
 
 if __name__ == "__main__":

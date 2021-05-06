@@ -7,6 +7,7 @@ from uszipcode import SearchEngine
 import numpy as np
 import networkx as nx
 import random
+import itertools
 import hyplogging
 import lightgraphs
 
@@ -130,6 +131,25 @@ class Dataset(object):
                 right_vertex_name = self.vertex_labels[right_set[i]] if i < len(right_set) else ''
                 hyplogging.logger.info(
                     f"{left_vertex_name: ^{max_item_length}}|{right_vertex_name: ^{max_item_length}}")
+
+    def log_multiple_clusters(self, clusters):
+        if self.vertex_labels is None:
+            for cluster_id in range(len(clusters)):
+                hyplogging.logger.info(f"  Cluster {cluster_id}: {clusters[cluster_id]}")
+        else:
+            max_items = max(map(len, clusters))
+            max_item_length =\
+                max(map(len, [self.vertex_labels[i] for i in itertools.chain.from_iterable(clusters)])) + 2
+            hyplogging.logger.info(
+                '|'.join([f"{'Cluster ' + str(c_id): ^{max_item_length}}" for c_id in range(len(clusters))]))
+            hyplogging.logger.info('|'.join([f"{'-' * max_item_length}" for i in range(len(clusters))]))
+            for i in range(max_items):
+                these_names = []
+                for cluster_id in range(len(clusters)):
+                    these_names.append(
+                        self.vertex_labels[clusters[cluster_id][i]] if i < len(clusters[cluster_id]) else '')
+                hyplogging.logger.info(
+                    '|'.join([f"{these_names[cluster_id]: ^{max_item_length}}" for cluster_id in range(len(clusters))]))
 
     def load_data(self):
         """
