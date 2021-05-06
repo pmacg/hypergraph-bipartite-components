@@ -344,5 +344,21 @@ def wikipedia_categories_experiment():
         categories_dataset.log_two_sets(left_set, right_set)
 
 
+def dblp_experiment():
+    """Run experiments with the DBLP dataset."""
+    dblp_dataset = datasets.DblpDataset(max_authors=2)
+
+    # Run the diffusion algorithm
+    clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=3, approximate=True)
+
+    for i, cluster in enumerate(clusters):
+        print()
+        hyplogging.logger.info(f"Cluster {i + 1}")
+        for index in cluster:
+            vertex_name = dblp_dataset.vertex_labels[index]
+            hyplogging.logger.info(f"{vertex_name}")
+        print()
+
+
 if __name__ == "__main__":
-    wikipedia_categories_experiment()
+    dblp_experiment()

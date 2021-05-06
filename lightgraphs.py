@@ -64,9 +64,9 @@ class LightHypergraph(object):
         # In order to construct the induced graph, we need to construct a list of edges in the new hypergraph.
         new_edges = []
         for edge in self.edges:
-            if len(node_list_set.intersection(edge)) == len(edge):
-                # This edge should be included in the induced hypergraph.
-                new_edges.append([node_list.index(v) for v in edge])
+            # We keep the subset of each edge which is incident on the new vertex set
+            if len(node_list_set.intersection(edge)) > 1:
+                new_edges.append([node_list.index(v) for v in node_list_set.intersection(edge)])
 
         # Construct the new hypergraph and return it
         return LightHypergraph(new_edges)

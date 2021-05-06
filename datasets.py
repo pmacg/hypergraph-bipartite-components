@@ -609,3 +609,93 @@ class MidDataset(Dataset):
         # Now construct the hypergraphs from this graph
         self.graph_hypergraph = self.construct_simple_hypergraph()
         self.hypergraph = self.construct_bipartite_motif_hypergraph()
+
+
+class DblpDataset(Dataset):
+    """DBLP and ACM datasets from https://github.com/Jhy1993/HAN"""
+
+    def __init__(self, nodes=None, max_authors=None):
+        """
+        We will always use the papers to define the edges in the hypergraph, However, the nodes can consist of
+        different items.
+
+        :param nodes: What object types to use as nodes. Can be a list with any combination of 'author', 'paper', and
+                      'conf'.
+        :param max_authors: The maximum number of authors to include for a single paper. Set this to some number to
+                            limit the rank of the hypergraph.
+        """
+        self.max_authors = max_authors
+        self.nodes = nodes
+        if self.nodes is None:
+            # By default, construct a hypergraph with two node types: authors and conferences.
+            self.nodes = ["author", "conf"]
+
+        super().__init__()
+
+    @staticmethod
+    def load_nodes_from(filename, next_node_index):
+        """
+        Given a file containing node labels, and the next node index to use, construct a list of node labels
+        and a dictionary of file indices to the node index we will use.
+
+        Return the list, dictionary, and the next unused node index.
+
+        :param filename:
+        :param next_node_index:
+        :return:
+        """
+        new_node_labels = []
+        file_index_dictionary = {}
+        with open(filename, 'r') as f_in:
+            for line in f_in.readlines():
+                split_line = line.strip().split()
+                node_name = ' '.join(split_line[1:])
+                new_node_labels.append(node_name)
+                file_index_dictionary[split_line[0]] = next_node_index
+                next_node_index += 1
+
+        return new_node_labels, file_index_dictionary, next_node_index
+
+    @staticmethod
+    def load_adjacencies_from(filename):
+        """
+        Given a filename with the adjacencies between a paper and other node types, load and return the tuples
+        (paper ID, file_node_index)
+
+        :param filename:
+        :return:
+        """
+        with open(filename, 'r') as f_in:
+            for line in f_in.readlines():
+                yield tuple(line.strip().split())
+
+    def load_data(self):
+        hyplogging.logger.info(f"Loading DBLP dataset with nodes {self.nodes}")
+        # Start by constructing the vertex set of the hypergraph.
+        # We will store this as a dictionary of dictionaries. The top level is the different configured node types.
+        # The second level is the name of the node to the node index.
+        #
+        # We will similarly store the mapping from the index given in the file, to the index we use internally for the
+        # node. The indices in the files do not start at 0.
+        file_index_to_internal = {node_type: {} for node_type in self.nodes}
+        next_node_index = 0
+        for node_type in self.nodes:
+            new_vertex_labels, file_index_to_internal[node_type], next_node_index =\
+                self.load_nodes_from(f"data/dblp/{node_type}.txt", next_node_index)
+            self.vertex_labels.extend(new_vertex_labels)
+
+        # Now, we construct the hyperedges. We will build a dictionary from the ID of the paper to the node of every
+        # vertex in the corresponding edge.
+        adjacency_list = {}
+        for node_type in self.nodes:
+            for paper_id, file_node_index in self.load_adjacencies_from(f"data/dblp/paper_{node_type}.txt"):
+                if paper_id not in adjacency_list:
+                    adjacency_list[paper_id] = [file_index_to_internal[node_type][file_node_index]]
+                else:
+                    if (node_type != 'author' or
+                            self.max_authors is None or
+                            len(adjacency_list[paper_id]) < self.max_authors):
+                        adjacency_list[paper_id].append(file_index_to_internal[node_type][file_node_index])
+
+        self.hypergraph = lightgraphs.LightHypergraph(list(adjacency_list.values()))
+        self.is_loaded = True
