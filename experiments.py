@@ -171,7 +171,7 @@ def foodweb_experiment():
 
     print("Running diffusion....")
     hyplogging.logger.info("Running the diffusion process on the foodweb graph.")
-    clusters = hypalgorithms.recursive_bipartite_diffusion(foodweb_dataset.hypergraph, 2,
+    clusters = hypalgorithms.recursive_bipartite_diffusion(foodweb_dataset.hypergraph, 4,
                                                            step_size=1, max_time=100,
                                                            approximate=True)
 
@@ -322,15 +322,27 @@ def mid_experiment():
 
 def wikipedia_categories_experiment():
     """Run experiments on the wikipedia categories dataset."""
-    categories_dataset = datasets.WikipediaCategoriesDataset()
+    # This experiment is going to take a fair bit of trial-and-error. I will keep here, commented out, some key examples
+    # which may be worth revisiting.
+
+    # This hypergraph was constructed to be 2-colorable in the obvious way, and so maybe we are 'cheating' a little.
+    # But at least it demonstrates that the algorithm does actually work!
+    # categories_dataset = datasets.WikipediaCategoriesDataset(
+    #     "Faculty_by_university_or_college_in_Canada-Computer_scientists_by_field_of_research-0-3")
+
+    # This hypergraph does not 'cheat' - every computer scientist is included in the dataset. Our algorithm is capable
+    # of recovering the known underlying structure. (The clique algorithm can also uncover the structure).
+    # categories_dataset = datasets.WikipediaCategoriesDataset(
+    #     "faculty-Computer_scientists_by_field_of_research")
+
+    categories_dataset = datasets.WikipediaCategoriesDataset(
+        "bioinformatics")
 
     # Run the diffusion algorithm
-    left_set, right_set, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(categories_dataset.hypergraph,
-                                                                                    approximate=True)
-
-    # Show the left and right set.
-    categories_dataset.log_two_sets(left_set, right_set)
+    for left_set, right_set in hypalgorithms.find_max_cut(categories_dataset.hypergraph, return_each_pair=True,
+                                                          algorithm='diffusion'):
+        categories_dataset.log_two_sets(left_set, right_set)
 
 
 if __name__ == "__main__":
-    wikipedia_experiment()
+    wikipedia_categories_experiment()

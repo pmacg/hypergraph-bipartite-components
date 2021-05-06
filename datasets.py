@@ -115,6 +115,8 @@ class Dataset(object):
         :param right_set:
         :return:
         """
+        if len(left_set) + len(right_set) == 0:
+            return
         if self.vertex_labels is None:
             hyplogging.logger.info(f" Left Set: {left_set}")
             hyplogging.logger.info(f"Right Set: {right_set}")
@@ -437,11 +439,15 @@ class WikipediaCategoriesDataset(Dataset):
     The wikipedia categories dataset.
     """
 
+    def __init__(self, category_name):
+        self.category_name = category_name
+        super().__init__()
+
     def load_data(self):
         hyplogging.logger.info(f"Loading the wikipedia categories dataset.")
-        self.load_edgelist_and_labels("data/wikipedia-categories/categories.edgelist",
-                                      "data/wikipedia-categories/categories.vertices",
-                                      "data/wikipedia-categories/categories.edges",
+        self.load_edgelist_and_labels(f"data/wikipedia-categories/{self.category_name}.edgelist",
+                                      f"data/wikipedia-categories/{self.category_name}.vertices",
+                                      f"data/wikipedia-categories/{self.category_name}.edges",
                                       None, None)
         self.is_loaded = True
 

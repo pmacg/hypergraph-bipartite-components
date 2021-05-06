@@ -83,7 +83,8 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
         return _internal_bipartite_diffusion(s, hypergraph, max_time, step_size, approximate)
 
 
-def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algorithm="diffusion"):
+def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algorithm="diffusion",
+                 return_each_pair=False):
     """
     Use the specified algorithm to find a partitioning of the vertices into two sets. Run the algorithm recursively
     until the vertices are fully partitioned (similar to trevisan's algorithm).
@@ -93,6 +94,8 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
     :param step_size:
     :param approximate:
     :param algorithm: one of 'diffusion' or 'clique'
+    :param return_each_pair: If True, yield each pair of left and right sets as the iterations go, rather than the
+                             complete cut.
     :return:
     """
     left_set = []
@@ -112,6 +115,9 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
             new_l, new_r, _ = find_bipartite_set_clique(induced_hypergraph)
         else:
             raise AssertionError("Algorithm must be diffusion or clique.")
+
+        if return_each_pair:
+            yield [unclassified_nodes[i] for i in new_l], [unclassified_nodes[i] for i in new_r]
 
         # If the returned sets are empty, we cannot continue other than adding all remaining vertices to one of the sets
         if len(new_l) == 0 and len(new_r) == 0:
@@ -140,7 +146,9 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
 
         # Update the list of nodes yet to be classified.
         unclassified_nodes = [i for i in hypergraph.nodes if i not in left_set and i not in right_set]
-    return left_set, right_set
+
+    if not return_each_pair:
+        return left_set, right_set
 
 
 def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_size=0.1, use_random_initialisation=False,
