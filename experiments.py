@@ -364,5 +364,15 @@ def dblp_experiment():
     # dblp_dataset.log_multiple_clusters(clusters)
 
 
+def nlp_experiment():
+    """Run the experiment on the NLP dataset."""
+    nlp_dataset = datasets.NlpDataset()
+
+    # Run the diffusion algorithm, and report the result
+    for left_set, right_set in hypalgorithms.find_max_cut(nlp_dataset.hypergraph, approximate=True,
+                                                          return_each_pair=True):
+        nlp_dataset.log_two_sets(left_set, right_set)
+
+
 if __name__ == "__main__":
-    dblp_experiment()
+    nlp_experiment()

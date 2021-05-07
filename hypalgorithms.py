@@ -116,13 +116,13 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
         else:
             raise AssertionError("Algorithm must be diffusion or clique.")
 
-        if return_each_pair:
-            yield [unclassified_nodes[i] for i in new_l], [unclassified_nodes[i] for i in new_r]
-
         # If the returned sets are empty, we cannot continue other than adding all remaining vertices to one of the sets
         if len(new_l) == 0 and len(new_r) == 0:
             left_set.extend(unclassified_nodes)
             break
+
+        if return_each_pair:
+            yield [unclassified_nodes[i] for i in new_l], [unclassified_nodes[i] for i in new_r]
 
         # Figure out which way round to put the new sets
         possible_left_set = left_set.copy()

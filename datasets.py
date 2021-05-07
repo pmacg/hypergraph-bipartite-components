@@ -2,6 +2,8 @@
 This file provides an interface to each dataset we will use for our experiments.
 """
 import re
+
+import nltk.corpus
 from scipy.io import loadmat
 from uszipcode import SearchEngine
 import numpy as np
@@ -10,6 +12,7 @@ import random
 import itertools
 import hyplogging
 import lightgraphs
+from nltk.corpus import stopwords
 
 
 class Dataset(object):
@@ -721,4 +724,32 @@ class DblpDataset(Dataset):
                             adjacency_list[paper_id].append(file_index_to_internal[node_type][file_node_index])
 
         self.hypergraph = lightgraphs.LightHypergraph(list(adjacency_list.values()))
+        self.is_loaded = True
+
+
+class NlpDataset(Dataset):
+
+    def load_data(self):
+        """Load the NLP dataset from file"""
+        hyplogging.logger.info("Loading the NLP dataset.")
+        word_to_node_index = {}
+        next_node_index = 0
+        ignore_words = set(stopwords.words('english'))
+        edges = []
+
+        with open("data/nlp/toy-dataset-processed.txt") as f_in:
+            for line in f_in:
+                words_in_line = [word for word in line.strip().split() if word not in ignore_words]
+                new_edge = []
+
+                for word in words_in_line:
+                    if word not in word_to_node_index:
+                        word_to_node_index[word] = next_node_index
+                        self.vertex_labels.append(word)
+                        next_node_index += 1
+                    new_edge.append(word_to_node_index[word])
+                edges.append(new_edge)
+
+        # Construct the hypergraph object
+        self.hypergraph = lightgraphs.LightHypergraph(edges)
         self.is_loaded = True

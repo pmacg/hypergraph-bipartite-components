@@ -7,3 +7,4 @@ pandas
 clsz==0.2.0
 pycheeg==0.1.0
 uszipcode
+nltk
