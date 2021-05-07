@@ -346,19 +346,22 @@ def wikipedia_categories_experiment():
 
 def dblp_experiment():
     """Run experiments with the DBLP dataset."""
-    dblp_dataset = datasets.DblpDataset(max_authors=2)
+    # First, run the experiment with the author-conference hypergraph
+    dblp_dataset = datasets.DblpDataset()
 
     # Run the diffusion algorithm
-    clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=3, approximate=True)
+    clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=2, approximate=True)
     dblp_dataset.log_multiple_clusters(clusters)
 
-    # for i, cluster in enumerate(clusters):
-    #     hyplogging.logger.info("")
-    #     hyplogging.logger.info(f"Cluster {i + 1}")
-    #     for index in cluster:
-    #         vertex_name = dblp_dataset.vertex_labels[index]
-    #         hyplogging.logger.info(f"{vertex_name}")
-    #     hyplogging.logger.info("")
+    # The experiments commented out below do not quite demonstrate our algorithm. In order for the algorithm to perform
+    # well, the degree of each vertex needs to be large enough.
+    # Now, we load the author-conference-paper hypergraph and see what we can find.
+    # dblp_dataset = datasets.DblpDataset(nodes=['author', 'paper', 'conf'], max_authors=1)
+
+    # Run the diffusion algorithm
+    # clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=3, approximate=True,
+    #                                                        mix_and_match=False, use_random_initialisation=True)
+    # dblp_dataset.log_multiple_clusters(clusters)
 
 
 if __name__ == "__main__":

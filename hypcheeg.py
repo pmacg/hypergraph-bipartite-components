@@ -169,6 +169,21 @@ def hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r):
     return bipart
 
 
+def compute_total_bipartiteness(hypergraph, clusters):
+    """
+    Compute the total bipartiteness of all pairs of clusters in the given list of clusters.
+
+    :param hypergraph:
+    :param clusters:
+    :return:
+    """
+    bipartiteness_sum = 0
+    for i in range(len(clusters)):
+        for j in range(i + 1, len(clusters)):
+            bipartiteness_sum += hypergraph_bipartiteness(hypergraph, clusters[i], clusters[j])
+    return bipartiteness_sum
+
+
 def hypergraph_sweep_set(x, hypergraph):
     """
     Perform a sweep set procedure for a hypergraph in order to find a cut with low conductance.

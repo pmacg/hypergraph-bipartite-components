@@ -116,23 +116,15 @@ class Dataset(object):
         :param right_set:
         :return:
         """
-        if len(left_set) + len(right_set) == 0:
-            return
-        if self.vertex_labels is None:
-            hyplogging.logger.info(f" Left Set: {left_set}")
-            hyplogging.logger.info(f"Right Set: {right_set}")
-        else:
-            max_items = max(len(left_set), len(right_set))
-            max_item_length = max(map(len, [self.vertex_labels[i] for i in left_set + right_set])) + 2
-            hyplogging.logger.info(f"{'Left Set': ^{max_item_length}}|{'Right Set': ^{max_item_length}}")
-            hyplogging.logger.info(f"{'-' * max_item_length}|{'-' * max_item_length}")
-            for i in range(max_items):
-                left_vertex_name = self.vertex_labels[left_set[i]] if i < len(left_set) else ''
-                right_vertex_name = self.vertex_labels[right_set[i]] if i < len(right_set) else ''
-                hyplogging.logger.info(
-                    f"{left_vertex_name: ^{max_item_length}}|{right_vertex_name: ^{max_item_length}}")
+        self.log_multiple_clusters([left_set, right_set])
 
-    def log_multiple_clusters(self, clusters):
+    def log_multiple_clusters(self, clusters, max_rows=None):
+        """
+        Nicely format a list of clusters using the name of the vertices if available.
+        :param clusters:
+        :param max_rows: Optionally, specify the maximum number of rows to show
+        :return:
+        """
         if self.vertex_labels is None:
             for cluster_id in range(len(clusters)):
                 hyplogging.logger.info(f"  Cluster {cluster_id}: {clusters[cluster_id]}")
@@ -143,7 +135,10 @@ class Dataset(object):
             hyplogging.logger.info(
                 '|'.join([f"{'Cluster ' + str(c_id): ^{max_item_length}}" for c_id in range(len(clusters))]))
             hyplogging.logger.info('|'.join([f"{'-' * max_item_length}" for i in range(len(clusters))]))
+
             for i in range(max_items):
+                if max_rows is not None and i > max_rows:
+                    break
                 these_names = []
                 for cluster_id in range(len(clusters)):
                     these_names.append(
@@ -702,20 +697,28 @@ class DblpDataset(Dataset):
         for node_type in self.nodes:
             new_vertex_labels, file_index_to_internal[node_type], next_node_index =\
                 self.load_nodes_from(f"data/dblp/{node_type}.txt", next_node_index)
-            self.vertex_labels.extend(new_vertex_labels)
+
+            # Shorten the labels for the papers!
+            if node_type == 'paper':
+                self.vertex_labels.extend([f"Paper: {label[:15]}..." for label in new_vertex_labels])
+            else:
+                self.vertex_labels.extend(new_vertex_labels)
 
         # Now, we construct the hyperedges. We will build a dictionary from the ID of the paper to the node of every
         # vertex in the corresponding edge.
         adjacency_list = {}
         for node_type in self.nodes:
-            for paper_id, file_node_index in self.load_adjacencies_from(f"data/dblp/paper_{node_type}.txt"):
-                if paper_id not in adjacency_list:
-                    adjacency_list[paper_id] = [file_index_to_internal[node_type][file_node_index]]
-                else:
-                    if (node_type != 'author' or
-                            self.max_authors is None or
-                            len(adjacency_list[paper_id]) < self.max_authors):
-                        adjacency_list[paper_id].append(file_index_to_internal[node_type][file_node_index])
+            if node_type != 'paper':
+                for paper_id, file_node_index in self.load_adjacencies_from(f"data/dblp/paper_{node_type}.txt"):
+                    if paper_id not in adjacency_list:
+                        adjacency_list[paper_id] = [file_index_to_internal[node_type][file_node_index]]
+                        if 'paper' in self.nodes:
+                            adjacency_list[paper_id].append(file_index_to_internal['paper'][paper_id])
+                    else:
+                        if (node_type != 'author' or
+                                self.max_authors is None or
+                                len(adjacency_list[paper_id]) < self.max_authors):
+                            adjacency_list[paper_id].append(file_index_to_internal[node_type][file_node_index])
 
         self.hypergraph = lightgraphs.LightHypergraph(list(adjacency_list.values()))
         self.is_loaded = True

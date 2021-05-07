@@ -151,8 +151,64 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
         return left_set, right_set
 
 
+def check_cluster_pairs(clusters, hypergraph, max_time=100, step_size=0.1, use_random_initialisation=False,
+                        approximate=True):
+    """
+    Given a set of clusters in the hypergraph, check whether it is possible to improve the clustering by re-clustering
+    some pair of clusters.
+
+    :param clusters:
+    :param hypergraph:
+    :param max_time:
+    :param step_size:
+    :param use_random_initialisation:
+    :param approximate:
+    :return: the optimised clusters
+    """
+    improvement_found = True
+    max_iterations = 10
+    iterations = 0
+    while improvement_found or iterations >= max_iterations:
+        improvement_found = False
+
+        # The metric we will try to improve is the sum of the bipartiteness of every pair of clusters
+        current_bipartiteness_sum = hypcheeg.compute_total_bipartiteness(hypergraph, clusters)
+
+        # Look through each pair of clusters and try to find an improvement
+        for i in range(len(clusters)):
+            if improvement_found:
+                break
+            for j in range(i + 1, len(clusters)):
+                # Check if re-clustering these sets improves the bipartiteness
+                both_clusters = clusters[i] + clusters[j]
+                induced_hypergraph = hypergraph.induced_hypergraph(both_clusters)
+
+                # Run the diffusion
+                if induced_hypergraph.num_vertices > 0:
+                    candidate_induced_l, candidate_induced_r, _ = find_bipartite_set_diffusion(
+                        induced_hypergraph, max_time=max_time, step_size=step_size,
+                        use_random_initialisation=use_random_initialisation, approximate=approximate)
+                    candidate_l = [both_clusters[v] for v in candidate_induced_l]
+                    candidate_r = [both_clusters[v] for v in candidate_induced_r]
+
+                    # Check if it is better
+                    new_clusters = clusters.copy()
+                    new_clusters[i] = candidate_l
+                    new_clusters[j] = candidate_r
+                    new_bipartiteness_sum = hypcheeg.compute_total_bipartiteness(hypergraph, new_clusters)
+                    if new_bipartiteness_sum < current_bipartiteness_sum:
+                        # This is better. Update the clusters
+                        hyplogging.logger.debug(f"Found better clustering with clusters {i} and {j}.")
+                        improvement_found = True
+                        clusters[i] = candidate_l
+                        clusters[j] = candidate_r
+                        break
+
+    return clusters
+
+
 def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_size=0.1, use_random_initialisation=False,
-                                  approximate=False, return_unclassified=False):
+                                  approximate=False, return_unclassified=False, mix_and_match=False):
     """
     Run the bipartite diffusion process recursively, to return 2^iterations clusters. The remaining arguments have the
     same meaning as in the find_bipartite_set_diffusion method.
@@ -165,6 +221,8 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
     :param approximate:
     :param return_unclassified: Whether to treat the 'unclassified' set as a cluster in each iteration (i.e. return 3
                                 clusters per iteration.
+    :param mix_and_match: Whether to check each pair of clusters at the end of the algorithm to see if they can be split
+                          in such a way as to reduce the bipartiteness between them.
     :return: a list of lists containing the final clusters
     """
     current_clusters = [hypergraph.nodes]
@@ -198,8 +256,14 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
         # Update the current clusters for the next iteration.
         current_clusters = new_clusters
 
+    # Check for better clusters by the 'mix-and-match' algorithm.
+    clusters = [cluster for cluster in current_clusters if len(cluster) > 0]
+    if mix_and_match:
+        clusters = check_cluster_pairs(clusters, hypergraph, max_time=max_time, step_size=step_size,
+                                       use_random_initialisation=use_random_initialisation, approximate=approximate)
+
     # Return the non-empty clusters
-    return [cluster for cluster in current_clusters if len(cluster) > 0]
+    return clusters
 
 
 def find_bipartite_set_clique(hypergraph):

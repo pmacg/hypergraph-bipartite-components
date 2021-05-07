@@ -518,6 +518,7 @@ def approximate_diffusion_update_step(measure_vector, hypergraph, step_size):
     # Add the graph points for this time step
     inverse_degree_matrix = hyplap.hypergraph_degree_mat(hypergraph, inverse=True)
     this_ft = new_measure_vector @ inverse_degree_matrix @ new_measure_vector
+    hyplogging.logger.debug(f"Computed new value of this_ft: {this_ft}")
     negative_log_ft = - math.log(this_ft)
     x_tn = new_measure_vector / this_ft
 
