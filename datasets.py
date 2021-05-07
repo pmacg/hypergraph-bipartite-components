@@ -485,6 +485,8 @@ class MidDataset(Dataset):
         self.start_date = start_date
         self.end_date = end_date
         self.edgelist_filename = f"data/mid/dyadic_mid_{start_date}_{end_date}.edgelist"
+        self.hypergraph_edgelist_filename = f"data/mid/dyadic_mid_{start_date}_{end_date}_hypergraph.edgelist"
+        self.hypergraph_vertices_filename = f"data/mid/dyadic_mid_{start_date}_{end_date}_hypergraph.vertices"
 
         # The graph, graph_hypergraph and hypergraph objects will all have the same vertex set.
         self.graph = None
@@ -613,10 +615,8 @@ class MidDataset(Dataset):
                             hyperedges.extend(self.get_motif_hyperedges(u, v, w, x))
         return lightgraphs.LightHypergraph(hyperedges)
 
-    def load_data(self):
-        """
-        Read the graph from the edgelist file. Construct a hypergraph by replacing triangles with 3-edges.
-        """
+    def load_motif_hypergraph(self):
+        """Load the simple graph and construct a hypergraph from the motifs."""
         hyplogging.logger.info(f"Loading MID dataset from {self.edgelist_filename}")
 
         # Construct a networkx graph from the edgelist, and extract the largest connected component.
@@ -627,6 +627,19 @@ class MidDataset(Dataset):
         # Now construct the hypergraphs from this graph
         self.graph_hypergraph = self.construct_simple_hypergraph()
         self.hypergraph = self.construct_bipartite_motif_hypergraph()
+
+    def load_hypergraph(self):
+        """
+        Load the hypergraph directly constructed from the MID data.
+        :return:
+        """
+        hyplogging.logger.info(f"Loading MID dataset from {self.hypergraph_edgelist_filename}")
+        self.load_edgelist_and_labels(self.hypergraph_edgelist_filename, self.hypergraph_vertices_filename, None,
+                                      None, None)
+        self.is_loaded = True
+
+    def load_data(self):
+        self.load_hypergraph()
 
 
 class DblpDataset(Dataset):
