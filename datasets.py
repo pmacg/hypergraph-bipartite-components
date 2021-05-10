@@ -8,6 +8,8 @@ import numpy as np
 import networkx as nx
 import random
 import itertools
+import pandas as pd
+import pickle
 import hyplogging
 import lightgraphs
 
@@ -109,29 +111,38 @@ class Dataset(object):
         self.vertex_labels = self.load_list_from_file(vertex_labels)
         self.edge_labels = self.load_list_from_file(edge_labels)
 
-    def log_two_sets(self, left_set, right_set):
+    def log_two_sets(self, left_set, right_set, show_clusters=False):
         """
         Print two sets of vertices, using the vertex name if available.
         :param left_set:
         :param right_set:
+        :param show_clusters: Whether to show the cluster label of each item
         :return:
         """
-        self.log_multiple_clusters([left_set, right_set])
+        self.log_multiple_clusters([left_set, right_set], show_clusters=show_clusters)
 
-    def log_multiple_clusters(self, clusters, max_rows=None):
+    def log_multiple_clusters(self, clusters, max_rows=None, show_clusters=False):
         """
         Nicely format a list of clusters using the name of the vertices if available.
         :param clusters:
         :param max_rows: Optionally, specify the maximum number of rows to show
+        :param show_clusters: Whether to show the cluster label of each item
         :return:
         """
+        # Helper to construct the string to show for a given vertex index
+        def to_print_for_item(ind):
+            if not show_clusters:
+                return self.vertex_labels[ind]
+            else:
+                return f"{self.vertex_labels[ind]} ({self.cluster_labels[self.gt_clusters[ind]]})"
+
         if self.vertex_labels is None:
             for cluster_id in range(len(clusters)):
                 hyplogging.logger.info(f"  Cluster {cluster_id}: {clusters[cluster_id]}")
         else:
             max_items = max(map(len, clusters))
             max_item_length =\
-                max(map(len, [self.vertex_labels[i] for i in itertools.chain.from_iterable(clusters)])) + 2
+                max(map(len, [to_print_for_item(i) for i in itertools.chain.from_iterable(clusters)])) + 2
             hyplogging.logger.info(
                 '|'.join([f"{'Cluster ' + str(c_id): ^{max_item_length}}" for c_id in range(len(clusters))]))
             hyplogging.logger.info('|'.join([f"{'-' * max_item_length}" for i in range(len(clusters))]))
@@ -142,7 +153,7 @@ class Dataset(object):
                 these_names = []
                 for cluster_id in range(len(clusters)):
                     these_names.append(
-                        self.vertex_labels[clusters[cluster_id][i]] if i < len(clusters[cluster_id]) else '')
+                        to_print_for_item(clusters[cluster_id][i]) if i < len(clusters[cluster_id]) else '')
                 hyplogging.logger.info(
                     '|'.join([f"{these_names[cluster_id]: ^{max_item_length}}" for cluster_id in range(len(clusters))]))
 
@@ -251,6 +262,77 @@ class ImdbDataset(Dataset):
         for gt_id, cluster_label in enumerate(self.cluster_labels):
             proportion = gts.count(gt_id) / cluster_size
             hyplogging.logger.info(f"   {cluster_label}: {proportion}")
+
+
+class ActorDirectorDataset(Dataset):
+    """Create a simple dataset with actor and director information."""
+
+    @staticmethod
+    def get_nx_giant_component(graph):
+        """
+        Given a networkx graph, extract the giant component of the graph.
+        :param graph:
+        :return:
+        """
+        Gcc = sorted(nx.connected_components(graph), key=len, reverse=True)
+        return graph.subgraph(Gcc[0])
+
+    def load_data(self):
+        """Construct the hypergraph from the CSV of movie information."""
+        movie_filename = "data/imdb/movie_metadata.csv"
+        approved_filename = "data/imdb/connected_people.pickle"
+        df = pd.read_csv(movie_filename)
+
+        # We will include people only from the approved list - people in a connected subgraph.
+        with open(approved_filename, 'rb') as f_in:
+            approved_people = set(pickle.load(f_in))
+
+        # We will go through the csv line by line, building the hypergraph.
+        edge_labels = []
+        person_ids = {}
+        vertex_labels = []
+        vertex_gt = []
+        next_vertex_id = 0
+        edges = []
+        for row_ind in range(len(df)):
+            edge_labels.append(df.loc[row_ind, "movie_title"])
+
+            # For now, we only consider the director and one actor - proof of concept!
+            director_name = df.loc[row_ind, "director_name"]
+            actor1_name = df.loc[row_ind, "actor_1_name"]
+
+            # If any of the data does not exist, ignore this row
+            if type(director_name) is not str or type(actor1_name) is not str:
+                continue
+
+            this_edge = []
+            for person in [director_name, actor1_name]:
+                if person in approved_people:
+                    # Add the vertex id for this person if necessary
+                    if person not in person_ids:
+                        person_ids[person] = next_vertex_id
+                        vertex_labels.append(person)
+                        next_vertex_id += 1
+
+                        # Update the ground truth clusters
+                        if person == director_name:
+                            vertex_gt.append(0)
+                        else:
+                            vertex_gt.append(1)
+                    this_edge.append(person_ids[person])
+
+            # Update the hypergraph edges
+            if len(set(this_edge)) >= 2:
+                edges.append(this_edge)
+
+        # Fill out all of the dataset information
+        self.hypergraph = lightgraphs.LightHypergraph(edges)
+        self.vertex_labels = vertex_labels
+        self.edge_labels = edge_labels
+        self.gt_clusters = vertex_gt
+        self.cluster_labels = ["director", "actor"]
+
+        self.is_loaded = True
 
 
 class FoodWebDataset(Dataset):
