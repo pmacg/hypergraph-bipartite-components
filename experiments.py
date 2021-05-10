@@ -217,6 +217,7 @@ def actor_director_experiment():
     # Run the diffusion algorithm and display the result
     left, right, _ = hypalgorithms.find_bipartite_set_diffusion(dataset.hypergraph)
     dataset.log_two_sets(left, right, show_clusters=True)
+    dataset.log_confusion_matrix([left, right])
 
 
 def log_migration_result(filename, migration_dataset, title, left_set, right_set):

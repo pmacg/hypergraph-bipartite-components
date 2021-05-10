@@ -157,6 +157,45 @@ class Dataset(object):
                 hyplogging.logger.info(
                     '|'.join([f"{these_names[cluster_id]: ^{max_item_length}}" for cluster_id in range(len(clusters))]))
 
+    def log_confusion_matrix(self, clusters):
+        """Given a list of clusters, log the number in each cluster which corresponds to each ground truth value."""
+        # Work out the cell size to use when printing the table
+        cell_size = max(10, max(map(len, self.cluster_labels)))
+
+        # Given a list of the strings to print on a row, construct the full row string
+        def construct_row_string(list_of_contents):
+            return '|'.join([f"{item: ^{cell_size}}" for item in list_of_contents])
+
+        # Work out the horisontal line string
+        horizontal_line = construct_row_string(['-' * cell_size] * (len(self.cluster_labels) + 2))
+
+        # Print the header row with the cluster names
+        header_row = construct_row_string([''] + self.cluster_labels + [''])
+        hyplogging.logger.info(header_row)
+        hyplogging.logger.info(horizontal_line)
+
+        # Given the id of a ground truth cluster and a list of vertex indices, count the number of vertices in the
+        # cluster which are in the corresponding ground truth cluster.
+        def cluster_overlap(candidate_cluster, gt_id):
+            gt_cluster = set([node for node in range(len(self.gt_clusters)) if self.gt_clusters[node] == gt_id])
+            return len([node for node in candidate_cluster if node in gt_cluster])
+
+        # Print each of the cluster rows
+        gt_cluster_totals = [0] * len(self.cluster_labels)
+        for cluster_id, cluster in enumerate(clusters):
+            overlaps = [cluster_overlap(cluster, gt) for gt in range(len(self.cluster_labels))]
+            total = sum(overlaps)
+            cluster_row = construct_row_string([f"Cluster {cluster_id}"] + [str(o) for o in overlaps] + [str(total)])
+            hyplogging.logger.info(cluster_row)
+
+            # Update the cluster totals
+            gt_cluster_totals = [gt_cluster_totals[i] + overlaps[i] for i in range(len(self.cluster_labels))]
+
+        # Finally, print the bottom totals row
+        hyplogging.logger.info(horizontal_line)
+        bottom_row = construct_row_string([''] + gt_cluster_totals + [''])
+        hyplogging.logger.info(bottom_row)
+
     def load_data(self):
         """
         Load the dataset.
@@ -300,13 +339,15 @@ class ActorDirectorDataset(Dataset):
             # For now, we only consider the director and one actor - proof of concept!
             director_name = df.loc[row_ind, "director_name"]
             actor1_name = df.loc[row_ind, "actor_1_name"]
+            actor2_name = df.loc[row_ind, "actor_2_name"]
 
             # If any of the data does not exist, ignore this row
-            if type(director_name) is not str or type(actor1_name) is not str:
-                continue
+            for name in [director_name, actor1_name, actor2_name]:
+                if type(name) is not str:
+                    continue
 
             this_edge = []
-            for person in [director_name, actor1_name]:
+            for person in [director_name, actor1_name, actor2_name]:
                 if person in approved_people:
                     # Add the vertex id for this person if necessary
                     if person not in person_ids:
