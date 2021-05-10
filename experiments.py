@@ -212,12 +212,12 @@ def actor_director_experiment():
     Run experiments on the smaller IMDB dataset, looking to distinguish actors and directors.
     :return:
     """
-    dataset = datasets.ActorDirectorDataset()
-
-    # Run the diffusion algorithm and display the result
-    left, right, _ = hypalgorithms.find_bipartite_set_diffusion(dataset.hypergraph)
-    dataset.log_two_sets(left, right, show_clusters=True)
-    dataset.log_confusion_matrix([left, right])
+    # Run the diffusion for each of the three possible hypergraphs
+    for num_actors in [1, 2, 3]:
+        hyplogging.logger.info(f"Using {num_actors} actors.")
+        dataset = datasets.ActorDirectorDataset(num_actors=num_actors)
+        left, right, _ = hypalgorithms.find_bipartite_set_diffusion(dataset.hypergraph)
+        dataset.log_confusion_matrix([left, right])
 
 
 def log_migration_result(filename, migration_dataset, title, left_set, right_set):
@@ -347,11 +347,12 @@ def wikipedia_categories_experiment():
 
     # This hypergraph does not 'cheat' - every computer scientist is included in the dataset. Our algorithm is capable
     # of recovering the known underlying structure. (The clique algorithm can also uncover the structure).
-    # categories_dataset = datasets.WikipediaCategoriesDataset(
-    #     "faculty-Computer_scientists_by_field_of_research")
-
     categories_dataset = datasets.WikipediaCategoriesDataset(
-        "bioinformatics")
+        "faculty-Computer_scientists_by_field_of_research")
+
+    # This dataset does not particularly work
+    # categories_dataset = datasets.WikipediaCategoriesDataset(
+    #     "bioinformatics")
 
     # Run the diffusion algorithm
     for left_set, right_set in hypalgorithms.find_max_cut(categories_dataset.hypergraph, return_each_pair=True,

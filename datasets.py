@@ -306,6 +306,11 @@ class ImdbDataset(Dataset):
 class ActorDirectorDataset(Dataset):
     """Create a simple dataset with actor and director information."""
 
+    def __init__(self, num_actors=2):
+        """Optionally pass the number of actors to include in each hyperedge. Can be a maximum of 3."""
+        self.num_actors = num_actors
+        super().__init__()
+
     @staticmethod
     def get_nx_giant_component(graph):
         """
@@ -340,14 +345,16 @@ class ActorDirectorDataset(Dataset):
             director_name = df.loc[row_ind, "director_name"]
             actor1_name = df.loc[row_ind, "actor_1_name"]
             actor2_name = df.loc[row_ind, "actor_2_name"]
+            actor3_name = df.loc[row_ind, "actor_3_name"]
+            actors = [actor for actor in [actor1_name, actor2_name, actor3_name] if type(actor) is str]
+            actors = actors[:self.num_actors]
 
             # If any of the data does not exist, ignore this row
-            for name in [director_name, actor1_name, actor2_name]:
-                if type(name) is not str:
-                    continue
+            if type(director_name) is not str:
+                continue
 
             this_edge = []
-            for person in [director_name, actor1_name, actor2_name]:
+            for person in [director_name] + actors:
                 if person in approved_people:
                     # Add the vertex id for this person if necessary
                     if person not in person_ids:
