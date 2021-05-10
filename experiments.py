@@ -381,4 +381,10 @@ def dblp_experiment():
 
 
 if __name__ == "__main__":
-    actor_director_experiment()
+    # Real-world experiments
+    # wikipedia_categories_experiment()
+    # actor_director_experiment()
+    dblp_experiment()
+
+    # Run some synthetic experiments
+    # random_hypergraph_experiments()

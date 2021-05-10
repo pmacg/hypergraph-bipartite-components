@@ -94,7 +94,7 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
     :param step_size:
     :param approximate:
     :param algorithm: one of 'diffusion' or 'clique'
-    :param return_each_pair: If True, yield each pair of left and right sets as the iterations go, rather than the
+    :param return_each_pair: If True, yield each pair of left and right sets as the iterations goes, rather than the
                              complete cut.
     :return:
     """
