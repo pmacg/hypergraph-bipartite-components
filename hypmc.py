@@ -459,6 +459,11 @@ def diffusion_has_converged(t_steps, gts):
     :param gts:
     :return: boolean indicating convergence
     """
+    # If we have reached a g(t) value of 0, we have converged
+    if gts[-1] < 0.0000000001:
+        hyplogging.logger.info(f"Diffusion process has converged to 0 at time {t_steps[-1]}.")
+        return True
+
     # If we have been running for more than 11 time steps
     current_time = t_steps[-1]
     if current_time >= 11:

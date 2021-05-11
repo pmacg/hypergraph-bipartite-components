@@ -154,11 +154,8 @@ def simple_experiment(hypergraph, step_size=0.1, max_time=100):
                                                                                      approximate=True)
 
     hyplogging.logger.info("Running the random diffusion algorithm.")
-    rand_diff_alg_l, rand_diff_alg_r, rand_diff_bipart = hypalgorithms.find_bipartite_set_diffusion(hypergraph,
-                                                                                                    max_time=max_time,
-                                                                                                    step_size=step_size,
-                                                                                                    use_random_initialisation=True,
-                                                                                                    approximate=True)
+    rand_diff_alg_l, rand_diff_alg_r, rand_diff_bipart = hypalgorithms.find_bipartite_set_diffusion(
+        hypergraph, max_time=max_time, step_size=step_size, use_random_initialisation=True, approximate=True)
 
     hyplogging.logger.info(f"Clique algorithm bipartiteness: {clique_bipart}")
     hyplogging.logger.info(f"Random algorithm bipartiteness: {rand_bipart}")
@@ -380,11 +377,26 @@ def dblp_experiment():
     # dblp_dataset.log_multiple_clusters(clusters)
 
 
+def treebank_experiment():
+    """Run experiments with the Penn-Treebank dataset."""
+    # Start by loading the dataset
+    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=100, max_degree=float('inf'),
+                                                    categories_to_use=["Verb", "Adverb"])
+    # treebank_dataset.show_large_and_small_degree_vertices()
+
+    # Run the diffusion algorithm
+    for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph, return_each_pair=True,
+                                                  algorithm='diffusion'):
+        treebank_dataset.log_multiple_clusters([left, right])
+        treebank_dataset.log_confusion_matrix([left, right])
+
+
 if __name__ == "__main__":
     # Real-world experiments
     # wikipedia_categories_experiment()
     # actor_director_experiment()
-    dblp_experiment()
+    # dblp_experiment()
+    treebank_experiment()
 
     # Run some synthetic experiments
     # random_hypergraph_experiments()
