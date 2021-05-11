@@ -3,8 +3,8 @@ hypernetx~=0.3.7
 matplotlib~=3.3.3
 scipy~=1.5.4
 networkx~=2.5
-pandas
+pandas~=1.1.5
 clsz==0.2.0
 pycheeg==0.1.0
-uszipcode
-nltk
+uszipcode~=0.2.5
+nltk~=3.6.2

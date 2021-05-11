@@ -75,7 +75,7 @@ def random_hypergraph_experiments():
                         # Run the diffusion algorithm - random
                         start_time = time.time()
                         vertex_set_l, vertex_set_r, bipartiteness = hypalgorithms.find_bipartite_set_diffusion(
-                            hypergraph, step_size=1, approximate=True, use_random_initialisation=True)
+                            hypergraph, step_size=1, use_random_initialisation=True, approximate=True)
                         execution_time = time.time() - start_time
                         volume_l_r = hypcheeg.hypergraph_volume(hypergraph, vertex_set_l + vertex_set_r)
                         f_out.write(f"{bipartiteness},{volume_l_r},{execution_time}\n")
@@ -148,15 +148,14 @@ def simple_experiment(hypergraph, step_size=0.1, max_time=100):
 
     # Run the diffusion algorithm
     hyplogging.logger.info("Running the diffusion algorithm.")
-    diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(hypergraph,
+    diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(hypergraph, max_time=max_time,
                                                                                      step_size=step_size,
-                                                                                     max_time=max_time,
-                                                                                     approximate=True,
-                                                                                     use_random_initialisation=False)
+                                                                                     use_random_initialisation=False,
+                                                                                     approximate=True)
 
     hyplogging.logger.info("Running the random diffusion algorithm.")
     rand_diff_alg_l, rand_diff_alg_r, rand_diff_bipart = hypalgorithms.find_bipartite_set_diffusion(
-        hypergraph, step_size=step_size, max_time=max_time, approximate=True, use_random_initialisation=True)
+        hypergraph, max_time=max_time, step_size=step_size, use_random_initialisation=True, approximate=True)
 
     hyplogging.logger.info(f"Clique algorithm bipartiteness: {clique_bipart}")
     hyplogging.logger.info(f"Random algorithm bipartiteness: {rand_bipart}")
@@ -193,7 +192,7 @@ def imdb_experiment():
 
     hyplogging.logger.info("Running the diffusion algorithm.")
     diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(imdb_dataset.hypergraph,
-                                                                                     step_size=1, max_time=100,
+                                                                                     max_time=100, step_size=1,
                                                                                      approximate=True)
     hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
     hyplogging.logger.info(f"   SET 1")
@@ -203,6 +202,19 @@ def imdb_experiment():
 
     imdb_dataset.simple_cluster_check("Left Set", diff_alg_l)
     imdb_dataset.simple_cluster_check("Right Set", diff_alg_r)
+
+
+def actor_director_experiment():
+    """
+    Run experiments on the smaller IMDB dataset, looking to distinguish actors and directors.
+    :return:
+    """
+    # Run the diffusion for each of the three possible hypergraphs
+    for num_actors in [1, 2, 3]:
+        hyplogging.logger.info(f"Using {num_actors} actors.")
+        dataset = datasets.ActorDirectorDataset(num_actors=num_actors)
+        left, right, _ = hypalgorithms.find_bipartite_set_diffusion(dataset.hypergraph)
+        dataset.log_confusion_matrix([left, right])
 
 
 def log_migration_result(filename, migration_dataset, title, left_set, right_set):
@@ -332,11 +344,12 @@ def wikipedia_categories_experiment():
 
     # This hypergraph does not 'cheat' - every computer scientist is included in the dataset. Our algorithm is capable
     # of recovering the known underlying structure. (The clique algorithm can also uncover the structure).
-    # categories_dataset = datasets.WikipediaCategoriesDataset(
-    #     "faculty-Computer_scientists_by_field_of_research")
-
     categories_dataset = datasets.WikipediaCategoriesDataset(
-        "bioinformatics")
+        "faculty-Computer_scientists_by_field_of_research")
+
+    # This dataset does not particularly work
+    # categories_dataset = datasets.WikipediaCategoriesDataset(
+    #     "bioinformatics")
 
     # Run the diffusion algorithm
     for left_set, right_set in hypalgorithms.find_max_cut(categories_dataset.hypergraph, return_each_pair=True,
@@ -374,5 +387,26 @@ def nlp_experiment():
         nlp_dataset.log_two_sets(left_set, right_set)
 
 
+def treebank_experiment():
+    """Run experiments with the Penn-Treebank dataset."""
+    # Start by loading the dataset
+    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=100, max_degree=float('inf'),
+                                                    categories_to_use=["Verb", "Adverb"])
+    # treebank_dataset.show_large_and_small_degree_vertices()
+
+    # Run the diffusion algorithm
+    for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph, return_each_pair=True,
+                                                  algorithm='diffusion'):
+        treebank_dataset.log_multiple_clusters([left, right])
+        treebank_dataset.log_confusion_matrix([left, right])
+
+
 if __name__ == "__main__":
-    nlp_experiment()
+    # Real-world experiments
+    # wikipedia_categories_experiment()
+    # actor_director_experiment()
+    # dblp_experiment()
+    treebank_experiment()
+
+    # Run some synthetic experiments
+    # random_hypergraph_experiments()

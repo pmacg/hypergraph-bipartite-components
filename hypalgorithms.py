@@ -30,7 +30,7 @@ def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_si
 
 
 def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_random_initialisation=False,
-                                 approximate=False):
+                                 approximate=True):
     """
     Given a hypergraph, use the diffusion process to find an almost bipartite set.
     :param hypergraph: The hypergraph on which to find a bipartite set
@@ -94,7 +94,7 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
     :param step_size:
     :param approximate:
     :param algorithm: one of 'diffusion' or 'clique'
-    :param return_each_pair: If True, yield each pair of left and right sets as the iterations go, rather than the
+    :param return_each_pair: If True, yield each pair of left and right sets as the iterations goes, rather than the
                              complete cut.
     :return:
     """
@@ -115,6 +115,9 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
             new_l, new_r, _ = find_bipartite_set_clique(induced_hypergraph)
         else:
             raise AssertionError("Algorithm must be diffusion or clique.")
+
+        if return_each_pair and len(new_l) > 0 and len(new_r) > 0:
+            yield [unclassified_nodes[i] for i in new_l], [unclassified_nodes[i] for i in new_r]
 
         # If the returned sets are empty, we cannot continue other than adding all remaining vertices to one of the sets
         if len(new_l) == 0 and len(new_r) == 0:
@@ -185,9 +188,11 @@ def check_cluster_pairs(clusters, hypergraph, max_time=100, step_size=0.1, use_r
 
                 # Run the diffusion
                 if induced_hypergraph.num_vertices > 0:
-                    candidate_induced_l, candidate_induced_r, _ = find_bipartite_set_diffusion(
-                        induced_hypergraph, max_time=max_time, step_size=step_size,
-                        use_random_initialisation=use_random_initialisation, approximate=approximate)
+                    candidate_induced_l, candidate_induced_r, _ = find_bipartite_set_diffusion(induced_hypergraph,
+                                                                                               max_time=max_time,
+                                                                                               step_size=step_size,
+                                                                                               use_random_initialisation=use_random_initialisation,
+                                                                                               approximate=approximate)
                     candidate_l = [both_clusters[v] for v in candidate_induced_l]
                     candidate_r = [both_clusters[v] for v in candidate_induced_r]
 
@@ -238,9 +243,10 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
 
             # Run the diffusion on this hypergraph.
             if induced_hypergraph.num_vertices > 0:
-                cluster_l, cluster_r, _ = find_bipartite_set_diffusion(
-                    induced_hypergraph, max_time=max_time, step_size=step_size,
-                    use_random_initialisation=use_random_initialisation, approximate=approximate)
+                cluster_l, cluster_r, _ = find_bipartite_set_diffusion(induced_hypergraph, max_time=max_time,
+                                                                       step_size=step_size,
+                                                                       use_random_initialisation=use_random_initialisation,
+                                                                       approximate=approximate)
 
                 # Add the found clusters to the new list. Recall that the vertex indices in the induced hypergraph are
                 # equal to the vertex indices in the list 'cluster'.
