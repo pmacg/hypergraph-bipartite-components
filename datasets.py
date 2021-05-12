@@ -9,10 +9,12 @@ from uszipcode import SearchEngine
 import numpy as np
 import networkx as nx
 import random
+import os.path
 import itertools
 import pandas as pd
 import pickle
 import hyplogging
+import hypconstruct
 import lightgraphs
 from nltk.corpus import stopwords
 
@@ -1043,3 +1045,37 @@ class PennTreebankDataset(Dataset):
                                                                          node_degrees[node] > self.max_degree)]
         self.remove_nodes(nodes_to_remove)
         self.is_loaded = True
+
+
+class SbmDataset(Dataset):
+    """Load an edgelist file generated with the stochastic block model."""
+
+    def __init__(self, n, r, p, q, graph_num=None):
+        self.n = n
+        self.r = r
+        self.p = p
+        self.q = q
+        self.graph_num = graph_num
+        super().__init__()
+
+    def load_data(self):
+        """Load the hypergraph from the SBM edgelist file."""
+        filename = f"data/sbm/two_cluster_sbm_{self.n}_{self.r}_{self.p}_{self.q}" \
+                   f"{'_' + str(self.graph_num) if self.graph_num is not None else ''}.edgelist"
+        hyplogging.logger.info(f"Loading SBM hypergraph from {filename}")
+
+        # Check whether this graph has been generated with the SBM yet. If not, generate it.
+        if not os.path.isfile(filename):
+            hyplogging.logger.info("This hypergraph has not been generated from the SBM yet.")
+            hypconstruct.hypergraph_sbm_two_cluster(filename, self.n, self.r, self.p, self.q)
+
+        self.hypergraph = self.load_hypergraph_from_edgelist(filename)
+        self.num_vertices = self.hypergraph.num_vertices
+        self.num_edges = self.hypergraph.num_edges
+
+        # Set the cluster information
+        self.cluster_labels = ["Left Set", "Right Set"]
+        self.gt_clusters = ([0] * self.n) + ([1] * self.n)
+
+        self.is_loaded = True
+

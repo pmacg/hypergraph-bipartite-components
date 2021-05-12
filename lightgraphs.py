@@ -78,6 +78,7 @@ class LightGraph(object):
     def __init__(self, adj_mat):
         """Initialise the graph with an adjacency matrix. This should be a sparse scipy matrix."""
         self.adj_mat = adj_mat
+        self.lil_adj_mat = adj_mat.tolil()
 
         self.degrees = adj_mat.sum(axis=0).tolist()[0]
         self.inv_degrees = list(map(lambda x: 1 / x if x != 0 else 0, self.degrees))
@@ -95,3 +96,10 @@ class LightGraph(object):
 
     def inverse_sqrt_degree_matrix(self):
         return sp.sparse.spdiags(self.inv_sqrt_degrees, [0], self.num_vertices, self.num_vertices, format="csr")
+
+    def volume(self, vertex_set):
+        return sum([self.degrees[v] for v in vertex_set])
+
+    def bipartiteness(self, vertex_set_l, vertex_set_r):
+        w_l_r = self.lil_adj_mat[vertex_set_l][:, vertex_set_r].sum()
+        return 1 - 2 * w_l_r / self.volume(vertex_set_l + vertex_set_r)

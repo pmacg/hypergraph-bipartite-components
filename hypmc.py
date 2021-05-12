@@ -554,11 +554,11 @@ def diffusion_update_step(measure_vector, hypergraph, step_size):
 
     # Compute the graph points for this time step
     this_ft = new_measure_vector @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ new_measure_vector
-    negative_log_ft = - math.log(this_ft)
+    negative_log_ft = - math.log(this_ft) if this_ft > 0 else 100
     x_tn = new_measure_vector / this_ft
-    this_gt = (x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @
+    this_gt = (x_tn @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @
                hypergraph_measure_mc_laplacian(x_tn, hypergraph)) / (
-                      x_tn @ np.linalg.inv(hyplap.hypergraph_degree_mat(hypergraph)) @ x_tn)
+                      x_tn @ hyplap.hypergraph_degree_mat(hypergraph, inverse=True) @ x_tn)
 
     return new_measure_vector, this_gt, this_ft, negative_log_ft
 

@@ -2,7 +2,12 @@
 Various methods for constructing hypergraphs.
 """
 import hypernetx as hnx
+import numpy as np
+import numpy.random
+import scipy.special
 import random
+import math
+import hyplogging
 
 
 def construct_low_conductance_hypergraph(n1, n2, m, r, p1, p2):
@@ -142,3 +147,69 @@ def simple_not_two_colorable_hypergraph():
             'e12': [10, 11, 12]
         })
     return new_hypergraph
+
+
+def hypergraph_sbm_two_cluster(filename, n, r, p, q):
+    """
+    Generate a hypergraph from the hypergraph SBM and save the edgelist to the file specified.
+
+    Generates a hypergraph with two clusters of size n. Every possible rank r edge inside each cluster is added with
+    probability p. Every possible rank r edge between the two clusters is added with probability q.
+
+    :param filename:
+    :param n:
+    :param p:
+    :param q:
+    :return:
+    """
+    hyplogging.logger.info(f"Generating two cluster SBM hypergraph.")
+    hyplogging.logger.info(f"  filename = {filename}")
+    hyplogging.logger.info(f"         n = {n}")
+    hyplogging.logger.info(f"         r = {r}")
+    hyplogging.logger.info(f"         p = {p}")
+    hyplogging.logger.info(f"         q = {q}")
+
+    with open(filename, 'w') as edgelist_out:
+        # Start by generating the edges inside each cluster.
+        # Work out how many of them there will be - this is a number drawn from the binomial distribution
+        possible_edges_in_each_cluster = scipy.special.comb(n, r)
+        num_edges_in_left_cluster = np.random.binomial(possible_edges_in_each_cluster, p)
+        num_edges_in_right_cluster = np.random.binomial(possible_edges_in_each_cluster, p)
+        hyplogging.logger.debug(f"Possible edges in each cluster: {possible_edges_in_each_cluster}")
+        hyplogging.logger.debug(f"Edges in left cluster: {num_edges_in_left_cluster}")
+        hyplogging.logger.debug(f"Edges in right cluster: {num_edges_in_right_cluster}")
+
+        # Generate these edges
+        for _ in range(num_edges_in_left_cluster):
+            edge = random.sample(range(n), r)
+            edgelist_out.write(' '.join(map(str, edge)))
+            edgelist_out.write('\n')
+        for _ in range(num_edges_in_right_cluster):
+            edge = [v + n for v in random.sample(range(n), r)]
+            edgelist_out.write(' '.join(map(str, edge)))
+            edgelist_out.write('\n')
+
+        # Now, generate the edges between the clusters.
+        # We will consider each possible split between left and right clusters individually
+        for r_prime in range(1, r):
+            hyplogging.logger.debug(f"Considering r_prime = {r_prime}.")
+
+            # Get the number of possible edges with this split.
+            possible_edges_between_clusters = scipy.special.comb(n, r_prime) * scipy.special.comb(n, r - r_prime)
+            num_edges_between_clusters = np.random.binomial(possible_edges_between_clusters, q)
+            hyplogging.logger.debug(f"Possible edges between clusters: {possible_edges_between_clusters}")
+            hyplogging.logger.debug(f"Edges between clusters: {num_edges_between_clusters}")
+
+            # Generate the edges
+            for _ in range(num_edges_between_clusters):
+                edge = random.sample(range(n), r_prime) + [v + n for v in random.sample(range(n), r - r_prime)]
+                edgelist_out.write(' '.join(map(str, edge)))
+                edgelist_out.write('\n')
+
+
+if __name__ == "__main__":
+    n = 100
+    r = 4
+    p = 0.001
+    q = 0.001
+    hypergraph_sbm_two_cluster(f"data/sbm/two_cluster_sbm_{n}_{r}_{p}_{q}.edgelist", n, r, p, q)

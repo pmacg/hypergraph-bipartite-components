@@ -2,6 +2,7 @@
 This file implements some experiments on the hypergraph diffusion operator.
 """
 import time
+import statistics
 import clsz.cluster
 import clsz.metrics
 import hypconstruct
@@ -9,6 +10,116 @@ import hypalgorithms
 import hypcheeg
 import datasets
 import hyplogging
+import hypreductions
+
+
+def transpose_lists(lists):
+    """
+    Return the transpose of a list of lists.
+    """
+    return list(map(list, zip(*lists)))
+
+
+def run_single_sbm_experiment(sbm_dataset, run_lp=False):
+    """Given an SBM dataset, run the clique and diffusion algorithms, and report their performance."""
+    # We will repeatedly use the clique graph to compute vitalstatistix
+    clique_graph = hypreductions.hypergraph_clique_reduction(sbm_dataset.hypergraph)
+
+    # Run the clique algorithm
+    hyplogging.logger.info("Running the clique algorithm.")
+    start_time = time.time()
+    vertex_set_l, vertex_set_r, clique_hyp_bipart = hypalgorithms.find_bipartite_set_clique(sbm_dataset.hypergraph)
+    clique_execution_time = time.time() - start_time
+    clique_hyp_vol = hypcheeg.hypergraph_volume(sbm_dataset.hypergraph, vertex_set_l + vertex_set_r)
+    clique_clique_bipart = clique_graph.bipartiteness(vertex_set_l, vertex_set_r)
+    clique_clique_vol = clique_graph.volume(vertex_set_l + vertex_set_r)
+
+    # Run the exact diffusion algorithm if required
+    if run_lp:
+        hyplogging.logger.info("Running the exact diffusion algorithm.")
+        start_time = time.time()
+        vertex_set_l, vertex_set_r, diff_hyp_bipart = hypalgorithms.find_bipartite_set_diffusion(sbm_dataset.hypergraph,
+                                                                                                 approximate=False)
+        diff_execution_time = time.time() - start_time
+        diff_hyp_vol = hypcheeg.hypergraph_volume(sbm_dataset.hypergraph, vertex_set_l + vertex_set_r)
+        diff_clique_bipart = clique_graph.bipartiteness(vertex_set_l, vertex_set_r)
+        diff_clique_vol = clique_graph.volume(vertex_set_l + vertex_set_r)
+    else:
+        diff_hyp_bipart = None
+        diff_hyp_vol = None
+        diff_clique_bipart = None
+        diff_clique_vol = None
+        diff_execution_time = None
+
+    # Run the approximate diffusion algorithm
+    hyplogging.logger.info("Running the approximate diffusion algorithm.")
+    start_time = time.time()
+    vertex_set_l, vertex_set_r, approx_diff_hyp_bipart = hypalgorithms.find_bipartite_set_diffusion(
+        sbm_dataset.hypergraph, approximate=True)
+    approx_diff_execution_time = time.time() - start_time
+    approx_diff_hyp_vol = hypcheeg.hypergraph_volume(sbm_dataset.hypergraph, vertex_set_l + vertex_set_r)
+    approx_diff_clique_bipart = clique_graph.bipartiteness(vertex_set_l, vertex_set_r)
+    approx_diff_clique_vol = clique_graph.volume(vertex_set_l + vertex_set_r)
+
+    return [clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, clique_clique_vol, clique_execution_time,
+            diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, diff_clique_vol, diff_execution_time,
+            approx_diff_hyp_bipart, approx_diff_hyp_vol, approx_diff_clique_bipart, approx_diff_clique_vol,
+            approx_diff_execution_time]
+
+
+def sbm_experiments():
+    """Run experiments with the stochastic block model."""
+    # The key experiment is to fix n, r, and p and vary the ratio q/p.
+    n = 100
+    r = 3
+    p = 0.0001
+    average_over = 10
+    run_lp = True
+
+    with open(f"data/sbm/results/two_cluster_average_results_{n}_{r}_{p}_{average_over}.csv", 'w') as average_file:
+        # Write the header line of the average results file
+        average_file.write("n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
+                           "clique_clique_vol, clique_runtime, diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, "
+                           "diff_clique_vol, diff_runtime, approx_diff_hyp_bipart, approx_diff_hyp_vol, "
+                           "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime\n")
+
+        with open(f"data/sbm/results/two_cluster_results_{n}_{r}_{p}.csv", 'w') as results_file:
+            # Write the header line of the file
+            results_file.write("run_id, n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
+                               "clique_clique_vol, clique_runtime, diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, "
+                               "diff_clique_vol, diff_runtime, approx_diff_hyp_bipart, approx_diff_hyp_vol, "
+                               "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime\n")
+
+            # We will consider the following ratios of q/p
+            ratios = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+            run_id = 0
+            for ratio in ratios:
+                all_results = []
+                for graph_index in range(average_over):
+                    run_id += 1
+
+                    # Load the dataset and run the required algorithms
+                    q = ratio * p
+                    sbm_dataset = datasets.SbmDataset(n, r, p, q, graph_num=graph_index)
+                    results = run_single_sbm_experiment(sbm_dataset, run_lp=run_lp)
+                    results_string = ', '.join(map(str, results))
+
+                    # Update the list of results to be averaged
+                    all_results.append(results)
+
+                    # Write the results to file
+                    results_file.write(f"{run_id}, {n}, {r}, {p}, {q}, {ratio}, ")
+                    results_file.write(results_string)
+                    results_file.write('\n')
+                    results_file.flush()
+
+                # Write out the average result values
+                average_results = map(statistics.mean, transpose_lists(all_results))
+                average_results_string = ', '.join(map(str, average_results))
+                average_file.write(f"{n}, {r}, {p}, {q}, {ratio}, ")
+                average_file.write(average_results_string)
+                average_file.write('\n')
+                average_file.flush()
 
 
 def random_hypergraph_experiments():
@@ -19,7 +130,7 @@ def random_hypergraph_experiments():
     # We will run the clique algorithm and the approximate diffusion algorithm on a variety of graphs
     graph_sizes = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     ranks = [3]
-    edge_multipliers = [2**(3-2), 2**(3-1)]  # See Duraj et al. 2021
+    edge_multipliers = [2 ** (3 - 2), 2 ** (3 - 1)]  # See Duraj et al. 2021
     configuration_runs = 10
 
     total_runs = len(graph_sizes) * len(ranks) * len(edge_multipliers) * configuration_runs
@@ -86,7 +197,7 @@ def test_step_sizes():
     # We will run the diffusion algorithm and the approximate diffusion algorithm on a variety of graphs
     graph_sizes = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
     ranks = [3]
-    edge_multipliers = [2**(3-2), 2**(3-1)]  # See Duraj et al. 2021
+    edge_multipliers = [2 ** (3 - 2), 2 ** (3 - 1)]  # See Duraj et al. 2021
     configuration_runs = 10
     step_sizes = [0.1, 0.5, 1, 2, 5]
 
@@ -366,16 +477,6 @@ def dblp_experiment():
     clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=2, approximate=True)
     dblp_dataset.log_multiple_clusters(clusters)
 
-    # The experiments commented out below do not quite demonstrate our algorithm. In order for the algorithm to perform
-    # well, the degree of each vertex needs to be large enough.
-    # Now, we load the author-conference-paper hypergraph and see what we can find.
-    # dblp_dataset = datasets.DblpDataset(nodes=['author', 'paper', 'conf'], max_authors=1)
-
-    # Run the diffusion algorithm
-    # clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=3, approximate=True,
-    #                                                        mix_and_match=False, use_random_initialisation=True)
-    # dblp_dataset.log_multiple_clusters(clusters)
-
 
 def nlp_experiment():
     """Run the experiment on the NLP dataset."""
@@ -392,7 +493,6 @@ def treebank_experiment():
     # Start by loading the dataset
     treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=100, max_degree=float('inf'),
                                                     categories_to_use=["Verb", "Adverb"])
-    # treebank_dataset.show_large_and_small_degree_vertices()
 
     # Run the diffusion algorithm
     for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph, return_each_pair=True,
@@ -406,7 +506,7 @@ if __name__ == "__main__":
     # wikipedia_categories_experiment()
     # actor_director_experiment()
     # dblp_experiment()
-    treebank_experiment()
+    # treebank_experiment()
 
     # Run some synthetic experiments
-    # random_hypergraph_experiments()
+    sbm_experiments()
