@@ -24,6 +24,7 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
     """Given an SBM dataset, run the clique and diffusion algorithms, and report their performance."""
     # We will repeatedly use the clique graph to compute vitalstatistix
     clique_graph = hypreductions.hypergraph_clique_reduction(sbm_dataset.hypergraph)
+    results = []
 
     # Run the clique algorithm
     hyplogging.logger.info("Running the clique algorithm.")
@@ -33,6 +34,7 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
     clique_hyp_vol = hypcheeg.hypergraph_volume(sbm_dataset.hypergraph, vertex_set_l + vertex_set_r)
     clique_clique_bipart = clique_graph.bipartiteness(vertex_set_l, vertex_set_r)
     clique_clique_vol = clique_graph.volume(vertex_set_l + vertex_set_r)
+    results.extend([clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, clique_clique_vol, clique_execution_time])
 
     # Run the exact diffusion algorithm if required
     if run_lp:
@@ -44,12 +46,7 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
         diff_hyp_vol = hypcheeg.hypergraph_volume(sbm_dataset.hypergraph, vertex_set_l + vertex_set_r)
         diff_clique_bipart = clique_graph.bipartiteness(vertex_set_l, vertex_set_r)
         diff_clique_vol = clique_graph.volume(vertex_set_l + vertex_set_r)
-    else:
-        diff_hyp_bipart = None
-        diff_hyp_vol = None
-        diff_clique_bipart = None
-        diff_clique_vol = None
-        diff_execution_time = None
+        results.extend([diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, diff_clique_vol, diff_execution_time])
 
     # Run the approximate diffusion algorithm
     hyplogging.logger.info("Running the approximate diffusion algorithm.")
@@ -60,38 +57,50 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
     approx_diff_hyp_vol = hypcheeg.hypergraph_volume(sbm_dataset.hypergraph, vertex_set_l + vertex_set_r)
     approx_diff_clique_bipart = clique_graph.bipartiteness(vertex_set_l, vertex_set_r)
     approx_diff_clique_vol = clique_graph.volume(vertex_set_l + vertex_set_r)
+    results.extend([approx_diff_hyp_bipart, approx_diff_hyp_vol, approx_diff_clique_bipart, approx_diff_clique_vol,
+                    approx_diff_execution_time])
 
-    return [clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, clique_clique_vol, clique_execution_time,
-            diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, diff_clique_vol, diff_execution_time,
-            approx_diff_hyp_bipart, approx_diff_hyp_vol, approx_diff_clique_bipart, approx_diff_clique_vol,
-            approx_diff_execution_time]
+    return results
 
 
 def sbm_experiments():
     """Run experiments with the stochastic block model."""
     # The key experiment is to fix n, r, and p and vary the ratio q/p.
     n = 100
-    r = 3
-    p = 0.0001
     average_over = 10
-    run_lp = True
 
+    # We will run a few experiments
+    rs = [3, 4, 5]
+    ps = [0.0001, 0.00001, 0.000001]
+    run_lps = [True, False, False]
+
+    # Use the same ratios for each experiment
+    ratios = [0.1 * x for x in range(1, 31)]
+
+    for index in range(len(rs)):
+        sbm_experiment_internal(n, rs[index], ps[index], average_over, run_lps[index], ratios)
+
+
+def sbm_experiment_internal(n, r, p, average_over, run_lp, ratios):
     with open(f"data/sbm/results/two_cluster_average_results_{n}_{r}_{p}_{average_over}.csv", 'w') as average_file:
         # Write the header line of the average results file
         average_file.write("n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
-                           "clique_clique_vol, clique_runtime, diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, "
-                           "diff_clique_vol, diff_runtime, approx_diff_hyp_bipart, approx_diff_hyp_vol, "
+                           "clique_clique_vol, clique_runtime, "
+                           f"{'diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, ' if run_lp else ''}"
+                           f"{'diff_clique_vol, diff_runtime, ' if run_lp else ''}"
+                           "approx_diff_hyp_bipart, approx_diff_hyp_vol, "
                            "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime\n")
 
         with open(f"data/sbm/results/two_cluster_results_{n}_{r}_{p}.csv", 'w') as results_file:
             # Write the header line of the file
             results_file.write("run_id, n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
-                               "clique_clique_vol, clique_runtime, diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, "
-                               "diff_clique_vol, diff_runtime, approx_diff_hyp_bipart, approx_diff_hyp_vol, "
+                               "clique_clique_vol, clique_runtime, "
+                               f"{'diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, ' if run_lp else ''}"
+                               f"{'diff_clique_vol, diff_runtime, ' if run_lp else ''}"
+                               "approx_diff_hyp_bipart, approx_diff_hyp_vol, "
                                "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime\n")
 
             # We will consider the following ratios of q/p
-            ratios = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
             run_id = 0
             for ratio in ratios:
                 all_results = []
