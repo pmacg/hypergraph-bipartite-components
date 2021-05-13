@@ -66,39 +66,46 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
 def sbm_experiments():
     """Run experiments with the stochastic block model."""
     # The key experiment is to fix n, r, and p and vary the ratio q/p.
-    n = 100
+    n = 1000
     average_over = 10
 
     # We will run a few experiments
-    rs = [3, 4, 5]
-    ps = [0.0001, 0.00001, 0.000001]
-    run_lps = [True, False, False]
+    rs = [5]
+    ps = [1e-11]
+    run_lps = [False]
 
     # Use the same ratios for each experiment
-    ratios = [0.1 * x for x in range(1, 31)]
+    ratios = [0.1 * x for x in range(61, 101)]
+
+    # Whether to append results to the results files
+    append_results = True
 
     for index in range(len(rs)):
-        sbm_experiment_internal(n, rs[index], ps[index], average_over, run_lps[index], ratios)
+        sbm_experiment_internal(n, rs[index], ps[index], average_over, run_lps[index], ratios, append_results)
 
 
-def sbm_experiment_internal(n, r, p, average_over, run_lp, ratios):
-    with open(f"data/sbm/results/two_cluster_average_results_{n}_{r}_{p}_{average_over}.csv", 'w') as average_file:
+def sbm_experiment_internal(n, r, p, average_over, run_lp, ratios, append_results):
+    mode = 'a' if append_results else 'w'
+    with open(f"data/sbm/results/two_cluster_average_results_{n}_{r}_{p}_{average_over}.csv", mode) as average_file:
         # Write the header line of the average results file
-        average_file.write("n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
-                           "clique_clique_vol, clique_runtime, "
-                           f"{'diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, ' if run_lp else ''}"
-                           f"{'diff_clique_vol, diff_runtime, ' if run_lp else ''}"
-                           "approx_diff_hyp_bipart, approx_diff_hyp_vol, "
-                           "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime\n")
-
-        with open(f"data/sbm/results/two_cluster_results_{n}_{r}_{p}.csv", 'w') as results_file:
-            # Write the header line of the file
-            results_file.write("run_id, n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
+        if not append_results:
+            average_file.write("n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
                                "clique_clique_vol, clique_runtime, "
                                f"{'diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, ' if run_lp else ''}"
                                f"{'diff_clique_vol, diff_runtime, ' if run_lp else ''}"
                                "approx_diff_hyp_bipart, approx_diff_hyp_vol, "
                                "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime\n")
+
+        with open(f"data/sbm/results/two_cluster_results_{n}_{r}_{p}.csv", mode) as results_file:
+            # Write the header line of the file
+            if not append_results:
+                results_file.write(
+                    "run_id, n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
+                    "clique_clique_vol, clique_runtime, "
+                    f"{'diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, ' if run_lp else ''}"
+                    f"{'diff_clique_vol, diff_runtime, ' if run_lp else ''}"
+                    "approx_diff_hyp_bipart, approx_diff_hyp_vol, "
+                    "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime\n")
 
             # We will consider the following ratios of q/p
             run_id = 0
