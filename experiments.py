@@ -63,6 +63,30 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
     return results
 
 
+def sbm_runtime_experiment(n, r, p):
+    """
+    Compute the average runtime for the given parameters of graph. Print the output to screen - no need for CSV
+    fancy-ness.
+    """
+    # Fix the ratio q = 2 * p
+    q = 2 * p
+
+    # Compute the average performance over 10 runs
+    all_results = []
+    for i in range(10):
+        # Generate the hypergraph
+        sbm_dataset = datasets.SbmDataset(n, r, p, q, graph_num=i)
+        edges = sbm_dataset.hypergraph.num_edges
+        results = run_single_sbm_experiment(sbm_dataset)
+        results.append(edges)
+        all_results.append(results)
+
+    # Display the average results
+    average_results = list(map(statistics.mean, transpose_lists(all_results)))
+    hyplogging.logger.info(f"n = {n}, r = {r}, p = {p}, edges = {average_results[-1]}, "
+                           f"diff_runtime = {average_results[9]}, clique_runtime = {average_results[4]}")
+
+
 def sbm_experiments():
     """Run experiments with the stochastic block model."""
     # The key experiment is to fix n, r, and p and vary the ratio q/p.
@@ -75,7 +99,7 @@ def sbm_experiments():
     run_lps = [False]
 
     # Use the same ratios for each experiment
-    ratios = [0.1 * x for x in range(61, 101)]
+    ratios = [0.5 * x for x in range(21, 41)]
 
     # Whether to append results to the results files
     append_results = True
@@ -507,11 +531,17 @@ def nlp_experiment():
 def treebank_experiment():
     """Run experiments with the Penn-Treebank dataset."""
     # Start by loading the dataset
-    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=100, max_degree=float('inf'),
+    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=50, max_degree=100,
                                                     categories_to_use=["Verb", "Adverb"])
 
-    # Run the diffusion algorithm
+    # Run the approximate diffusion algorithm
     for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph, return_each_pair=True,
+                                                  algorithm='diffusion'):
+        treebank_dataset.log_multiple_clusters([left, right])
+        treebank_dataset.log_confusion_matrix([left, right])
+
+    # Run the exact diffusion algorithm
+    for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph, return_each_pair=True, approximate=False,
                                                   algorithm='diffusion'):
         treebank_dataset.log_multiple_clusters([left, right])
         treebank_dataset.log_confusion_matrix([left, right])
@@ -522,7 +552,8 @@ if __name__ == "__main__":
     # wikipedia_categories_experiment()
     # actor_director_experiment()
     # dblp_experiment()
-    # treebank_experiment()
+    treebank_experiment()
 
     # Run some synthetic experiments
-    sbm_experiments()
+    # sbm_experiments()
+    # sbm_runtime_experiment(1000, 5, 1e-9)
