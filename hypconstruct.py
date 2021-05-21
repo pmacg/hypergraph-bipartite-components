@@ -8,6 +8,7 @@ import scipy.special
 import random
 import math
 import hyplogging
+import lightgraphs
 
 
 def construct_low_conductance_hypergraph(n1, n2, m, r, p1, p2):
@@ -131,22 +132,19 @@ def simple_not_two_colorable_hypergraph():
     Construct and return the simplest 3-uniform hypergraph that is not two colorable.
     :return:
     """
-    new_hypergraph = hnx.Hypergraph(
-        {
-            'e1': [1, 2, 3],
-            'e2': [1, 2, 4],
-            'e3': [1, 2, 5],
-            'e4': [3, 4, 5],
-            'e5': [2, 6, 7],
-            'e6': [2, 6, 8],
-            'e7': [2, 6, 9],
-            'e8': [7, 8, 9],
-            'e9': [6, 1, 10],
-            'e10': [6, 1, 11],
-            'e11': [6, 1, 12],
-            'e12': [10, 11, 12]
-        })
-    return new_hypergraph
+    edges = [[1, 2, 3],
+             [1, 2, 4],
+             [1, 2, 5],
+             [3, 4, 5],
+             [2, 6, 7],
+             [2, 6, 8],
+             [2, 6, 9],
+             [7, 8, 9],
+             [6, 1, 10],
+             [6, 1, 11],
+             [6, 1, 0],
+             [10, 11, 0]]
+    return lightgraphs.LightHypergraph(edges)
 
 
 def hypergraph_sbm_two_cluster(filename, n, r, p, q):

@@ -5,6 +5,7 @@ The intention is to give a lightweight, minimal structure which should allow fas
 """
 import scipy as sp
 import scipy.sparse
+import hypernetx as hnx
 import math
 
 
@@ -48,6 +49,10 @@ class LightHypergraph(object):
 
     def number_of_edges(self):
         return self.num_edges
+
+    def to_hypernetx(self):
+        """Return a hypernetx graph which is equivalent to this hypergraph."""
+        return hnx.Hypergraph(self.edges)
 
     def induced_hypergraph(self, node_list):
         """

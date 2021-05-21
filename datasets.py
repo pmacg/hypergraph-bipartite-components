@@ -201,6 +201,59 @@ class Dataset(object):
         bottom_row = construct_row_string([''] + gt_cluster_totals + [''])
         hyplogging.logger.info(bottom_row)
 
+    def show_clustering_stats(self, clusters):
+        """
+        Given a list of clusters produced by some algorithm, report the key statistics for reporting.
+        """
+        # Given the id of a ground truth cluster and a list of vertex indices, count the number of vertices in the
+        # cluster which are in the corresponding ground truth cluster.
+        def cluster_overlap(candidate_cluster, gt_id):
+            gt_cluster = set([node for node in range(len(self.gt_clusters)) if self.gt_clusters[node] == gt_id])
+            return len([node for node in candidate_cluster if node in gt_cluster])
+
+        # Construct the confusion matrix
+        confusion_matrix = []
+        gt_cluster_totals = [0] * len(self.cluster_labels)
+        for cluster_id, cluster in enumerate(clusters):
+            overlaps = [cluster_overlap(cluster, gt) for gt in range(len(self.cluster_labels))]
+            confusion_matrix.append(overlaps)
+
+            # Update the cluster totals
+            gt_cluster_totals = [gt_cluster_totals[i] + overlaps[i] for i in range(len(self.cluster_labels))]
+
+        # For each GT cluster, print the precision and recall
+        for cluster_id in range(len(self.cluster_labels)):
+            hyplogging.logger.info(f"Cluster: {self.cluster_labels[cluster_id]}")
+
+            # Check the precision and recall given by each found cluster, and report the best
+            best_precision = 0
+            best_recall = 0
+            for found_cluster_id in range(len(clusters)):
+                # Compute the precision
+                if sum(confusion_matrix[found_cluster_id]) > 0:
+                    precision = confusion_matrix[found_cluster_id][cluster_id] / sum(confusion_matrix[found_cluster_id])
+                else:
+                    precision = 0
+
+                # Compute the recall
+                if gt_cluster_totals[cluster_id] > 0:
+                    recall = confusion_matrix[found_cluster_id][cluster_id] / gt_cluster_totals[cluster_id]
+                else:
+                    recall = 0
+
+                # Update the best stats
+                if precision > best_precision:
+                    best_precision = precision
+                if recall > best_recall:
+                    best_recall = recall
+
+            # Compute the f1 score
+            f1_score = 2 / ((1/best_recall) + (1/best_precision))
+
+            hyplogging.logger.info(f"    Precision: {best_precision}")
+            hyplogging.logger.info(f"       Recall: {best_recall}")
+            hyplogging.logger.info(f"           F1: {f1_score}")
+
     def show_large_and_small_degree_vertices(self):
         """
         Print a report of the vertices in the hypergraph with the largest and smallest degrees.
@@ -633,7 +686,8 @@ class WikipediaCategoriesDataset(Dataset):
         self.load_edgelist_and_labels(f"data/wikipedia-categories/{self.category_name}.edgelist",
                                       f"data/wikipedia-categories/{self.category_name}.vertices",
                                       f"data/wikipedia-categories/{self.category_name}.edges",
-                                      None, None)
+                                      f"data/wikipedia-categories/{self.category_name}.gt",
+                                      f"data/wikipedia-categories/{self.category_name}.clusters")
         self.is_loaded = True
 
 
@@ -928,7 +982,7 @@ class PennTreebankDataset(Dataset):
     def __init__(self, n=float('inf'), min_degree=8, max_degree=float('inf'), categories_to_use=None):
         """Take an argument specifying how many adjacent words to consider."""
         if categories_to_use is None:
-            categories_to_use = ["Adjective", "Noun", "Adverb", "Verb"]
+            categories_to_use = ["Adverb", "Verb"]
         self.n = n
         self.min_degree = min_degree
         self.max_degree = max_degree

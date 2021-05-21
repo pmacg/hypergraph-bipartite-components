@@ -427,12 +427,13 @@ def hyp_plot_conn_graph(phi, hypergraph, show_hyperedges=True):
     hyp_plot_with_graph(connection_graph, hypergraph, show_hyperedges=show_hyperedges)
 
 
-def hyp_plot_with_graph(graph, hypergraph, show_hyperedges=True):
+def hyp_plot_with_graph(graph, hypergraph, show_hyperedges=True, plot_graph_weights=False):
     """
     Plot a hypergraph with a simple graph on the same vertex set.
     :param graph: The simple graph
     :param hypergraph: The hypergraph
     :param show_hyperedges: Whether to plot the hyperedges of the hypergraph.
+    :param plot_graph_weights: Whether to plot the weights of the edges in the graph
     :return:
     """
     # Get the positioning of the nodes for drawing the hypergraph
@@ -468,6 +469,9 @@ def hyp_plot_with_graph(graph, hypergraph, show_hyperedges=True):
 
     # Draw the edges only from the connectivity graph.
     nx.draw_networkx_edges(graph, pos=pos)
+    if plot_graph_weights:
+        labels = nx.get_edge_attributes(graph, 'weight')
+        nx.draw_networkx_edge_labels(graph, pos, edge_labels=labels)
     plt.show()
 
 

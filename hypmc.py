@@ -275,7 +275,7 @@ def compute_mc_edge_info(f, hypergraph, debug=False):
 # ==========================================================
 # Compute the hypergraph max cut operator for a given vector
 # ==========================================================
-def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False):
+def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False, construct_induced=False):
     """
     Given a vector in the weighted space, compute the gradient
          r = df/dt = - L_H f
@@ -284,6 +284,7 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
     :param hypergraph:
     :param debug: Whether to print debug information
     :param approximate: Do not use the LP to compute the gradient, instead use the approximate induced graph.
+    :param construct_induced: Whether to construct the induced graph at each step.
     :return:
     """
     # We will round the vector f to a small(ish) precision so as to
@@ -318,8 +319,8 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
             # This is the first time we've seen this value
             equiv_classes[f[vertex_index]] = [vertex_name]
 
-    if debug:
-        print("Equivalence classes:", equiv_classes)
+    # We will keep track of the r_e(v) values. Keys are edges. Values are lists of (vertex, r_e(v)) tuples.
+    edge_induced_gradients = {}
 
     # We now iterate through the equivalence classes for the remainder of the algorithm
     for _, U in equiv_classes.items():
@@ -335,12 +336,121 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
             for v in best_p:
                 r[vertex_name_to_index[v]] = max_delta
                 u_temp.remove(v)
-    if debug:
-        print("Complete Gradient:", r)
+
+            # Compute the r_e(v) values for the vertices in best_p
+            if construct_induced:
+                # Set up the flow problem
+                flow_graph = nx.DiGraph()
+                flow_graph.add_node('s')
+                flow_graph.add_node('t')
+
+                # Add the nodes in the set T
+                for v in best_p:
+                    flow_graph.add_node(v)
+                    if max_delta >= 0:
+                        flow_graph.add_edge(v, 't', capacity=(hypergraph.degree(v) * max_delta))
+                    else:
+                        flow_graph.add_edge('s', v, capacity=abs(hypergraph.degree(v) * max_delta))
+
+                # Add the nodes in the set E_T^+ and E_T^-
+                for e, e_info in edge_info.items():
+                    if len(set(best_p).intersection(e_info[3])) > 0:
+                        edge_name = 'e' + str(e)
+                        flow_graph.add_node(edge_name)
+
+                        if e_info[2] < 0:
+                            # This edge is in E_T^+
+                            flow_graph.add_edge('s', edge_name, capacity=abs(round(e_info[2], 4)))
+                            for v in best_p:
+                                if v in e_info[3]:
+                                    # Infinite capacity
+                                    flow_graph.add_edge(edge_name, v)
+                        else:
+                            # This edge is in E_T^-
+                            flow_graph.add_edge(edge_name, 't', capacity=round(e_info[2], 4))
+                            for v in best_p:
+                                if v in e_info[3]:
+                                    # Infinite capacity
+                                    flow_graph.add_edge(v, edge_name)
+
+                # Solve the flow problem and add the gradients to the dictionary
+                _, flow_result = nx.maximum_flow(flow_graph, 's', 't')
+                for vertex, flow_dictionary in flow_result.items():
+                    if vertex in ['s', 't']:
+                        continue
+                    for other_vertex, flow in flow_dictionary.items():
+                        if other_vertex in ['s', 't'] or flow == 0:
+                            continue
+
+                        # This is a non-zero flow
+                        if type(vertex) == str:
+                            # This vertex is an edge, meaning there is a positive rate of flow from this edge to the
+                            # vertex
+                            if vertex not in edge_induced_gradients:
+                                edge_induced_gradients[vertex] = {other_vertex: flow}
+                            else:
+                                edge_induced_gradients[vertex][other_vertex] = flow
+                        else:
+                            # This vertex is an edge, meaning there is a negative rate of flow from the edge to the
+                            # vertex
+                            if other_vertex not in edge_induced_gradients:
+                                edge_induced_gradients[other_vertex] = {vertex: -flow}
+                            else:
+                                edge_induced_gradients[other_vertex][vertex] = -flow
+
+    # Now, construct the induced graph
+    if construct_induced:
+        induced_graph = nx.Graph()
+
+        # Add the vertices
+        for v in hypergraph.nodes:
+            induced_graph.add_node(v)
+
+        # Compute the edges for each hyperedge
+        for edge_name, weights in edge_induced_gradients.items():
+            # Solve the flow problem to compute the edge weights in this edge
+            flow_graph = nx.DiGraph()
+            flow_graph.add_node('s')
+            flow_graph.add_node('t')
+
+            # Get the edge info for this edge
+            e_info = edge_info[int(edge_name[1:])]
+
+            i_e = []
+            s_e = []
+            for vertex, weight in weights.items():
+                flow_graph.add_node(vertex)
+                if vertex in e_info[0]:
+                    # This vertex is in I(e)
+                    flow_graph.add_edge(vertex, 't', capacity=abs(weight))
+                    i_e.append(vertex)
+                else:
+                    # This vertex is in S(e)
+                    flow_graph.add_edge('s', vertex, capacity=abs(weight))
+                    s_e.append(vertex)
+            for v in i_e:
+                for u in s_e:
+                    # Add an infinite capacity edge between the vertices in s(e), i(e)
+                    flow_graph.add_edge(u, v)
+
+            # Solve the flow problem, and add the weights to the induced graph
+            flow_value, flow_solution = nx.maximum_flow(flow_graph, 's', 't')
+            for v, edges in flow_solution.items():
+                for u, weight in edges.items():
+                    if v in ['s', 't'] or u in ['s', 't'] or round(flow_value, 4) == 0:
+                        continue
+                    if round(weight/flow_value, 4) > 0:
+                        induced_graph.add_edge(v, u, weight=round(weight/flow_value, 2))
+
+        # Plot the induced graph
+        print(edge_info)
+        print(f)
+        hyplap.hyp_plot_with_graph(induced_graph, hypergraph.to_hypernetx(), plot_graph_weights=True)
+
     return r
 
 
-def hypergraph_measure_mc_laplacian(phi, hypergraph, debug=False, approximate=False):
+def hypergraph_measure_mc_laplacian(phi, hypergraph, debug=False, approximate=False, construct_induced=False):
     """
     Apply the hypergraph max cut operator to a vector phi in the measure space.
     In the normal language of graphs, this operator would be written as:
@@ -349,10 +459,12 @@ def hypergraph_measure_mc_laplacian(phi, hypergraph, debug=False, approximate=Fa
     :param hypergraph: The underlying hypergraph
     :param debug: Whether to print debug information
     :param approximate: Whether to use the approximate no-LP version
+    :param construct_induced: Whether to construct and report the induced graph at each step
     :return: L_H x
     """
     f = hyplap.measure_to_weighted(phi, hypergraph)
-    r = weighted_mc_diffusion_gradient(f, hypergraph, debug=debug, approximate=approximate)
+    r = weighted_mc_diffusion_gradient(f, hypergraph, debug=debug, approximate=approximate,
+                                       construct_induced=construct_induced)
     return -hyplap.hypergraph_degree_mat(hypergraph) @ r
 
 
@@ -461,7 +573,7 @@ def diffusion_has_converged(t_steps, gts):
     """
     # If we have reached a g(t) value of 0, we have converged
     if gts[-1] < 0.0000000001:
-        hyplogging.logger.info(f"Diffusion process has converged to 0 at time {t_steps[-1]}.")
+        hyplogging.logger.debug(f"Diffusion process has converged to 0 at time {t_steps[-1]}.")
         return True
 
     # If we have been running for more than 11 time steps
@@ -479,7 +591,7 @@ def diffusion_has_converged(t_steps, gts):
 
         if diff < 0.001:
             # We have converged
-            hyplogging.logger.info(f"Diffusion process has converged at time {t}")
+            hyplogging.logger.debug(f"Diffusion process has converged at time {t}")
             return True
     return False
 
@@ -534,7 +646,7 @@ def approximate_diffusion_update_step(measure_vector, hypergraph, step_size):
     return new_measure_vector, this_gt, this_ft, negative_log_ft
 
 
-def diffusion_update_step(measure_vector, hypergraph, step_size):
+def diffusion_update_step(measure_vector, hypergraph, step_size, construct_induced=False):
     """
     Given the current measure vector, hypergraph and step size, perform an update step of the diffusion process.
 
@@ -546,10 +658,11 @@ def diffusion_update_step(measure_vector, hypergraph, step_size):
     :param measure_vector:
     :param hypergraph:
     :param step_size:
+    :param construct_induced:
     :return:
     """
     # Apply the diffusion operator
-    grad_hyp = -hypergraph_measure_mc_laplacian(measure_vector, hypergraph)
+    grad_hyp = -hypergraph_measure_mc_laplacian(measure_vector, hypergraph, construct_induced=construct_induced)
     new_measure_vector = measure_vector + step_size * grad_hyp
 
     # Compute the graph points for this time step
@@ -608,7 +721,7 @@ def choose_update_step_size(min_step, measure_vector, hypergraph):
 # Simulate the max cut heat diffusion process
 # =======================================================
 def sim_mc_heat_diff(phi, hypergraph, max_time=1, min_step=0.1, debug=False, plot_diff=False,
-                     check_converged=False, approximate=False, adaptive_step_size=True):
+                     check_converged=False, approximate=False, adaptive_step_size=True, construct_induced=False):
     """
     Simulate the heat diffusion process for the hypergraph max cut operator.
     :param phi: The measure vector at the start of the process
@@ -620,14 +733,15 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, min_step=0.1, debug=False, plo
     :param check_converged: Whether to check for convergence of G(t)
     :param approximate: Whether to use the approximate no-LP version of the diffusion operator
     :param adaptive_step_size: Whether to vary the step size to shorted convergence time
+    :param construct_induced: Whether to construct and report the induced graph at each step of the diffusion process.
     :return: A measure vector at the end of the process, the final time of the diffusion process, the sequence of G(T)
     """
-    hyplogging.logger.info(f"Beginning heat diffusion process.")
-    hyplogging.logger.info(f"   max_time        = {max_time}")
-    hyplogging.logger.info(f"   min_step        = {min_step}")
-    hyplogging.logger.info(f"   approximate     = {approximate}")
-    hyplogging.logger.info(f"   check_converged = {check_converged}")
-    hyplogging.logger.info(f"adaptive_step_size = {adaptive_step_size}")
+    hyplogging.logger.debug(f"Beginning heat diffusion process.")
+    hyplogging.logger.debug(f"   max_time        = {max_time}")
+    hyplogging.logger.debug(f"   min_step        = {min_step}")
+    hyplogging.logger.debug(f"   approximate     = {approximate}")
+    hyplogging.logger.debug(f"   check_converged = {check_converged}")
+    hyplogging.logger.debug(f"adaptive_step_size = {adaptive_step_size}")
 
     # If we are going to plot the diffusion process, we will show the following quantities:
     #  F(t) = \phi_t D^{-1} \phi_t
@@ -668,7 +782,8 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, min_step=0.1, debug=False, plo
 
         # Apply an update step of the diffusion process
         if not approximate:
-            new_xt, this_gt, this_ft, this_negative_log_ft = diffusion_update_step(x_t, hypergraph, step_size)
+            new_xt, this_gt, this_ft, this_negative_log_ft = diffusion_update_step(x_t, hypergraph, step_size,
+                                                                                   construct_induced=construct_induced)
         else:
             new_xt, this_gt, this_ft, this_negative_log_ft = approximate_diffusion_update_step(
                 x_t, hypergraph, step_size)

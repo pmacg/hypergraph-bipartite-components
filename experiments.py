@@ -11,6 +11,7 @@ import hypcheeg
 import datasets
 import hyplogging
 import hypreductions
+import lightgraphs
 
 
 def transpose_lists(lists):
@@ -99,7 +100,7 @@ def sbm_experiments():
     run_lps = [False]
 
     # Use the same ratios for each experiment
-    ratios = [0.5 * x for x in range(21, 41)]
+    ratios = [0.5 * x for x in range(51, 61)]
 
     # Whether to append results to the results files
     append_results = True
@@ -485,27 +486,21 @@ def mid_experiment():
 
 def wikipedia_categories_experiment():
     """Run experiments on the wikipedia categories dataset."""
-    # This experiment is going to take a fair bit of trial-and-error. I will keep here, commented out, some key examples
-    # which may be worth revisiting.
-
-    # This hypergraph was constructed to be 2-colorable in the obvious way, and so maybe we are 'cheating' a little.
-    # But at least it demonstrates that the algorithm does actually work!
-    # categories_dataset = datasets.WikipediaCategoriesDataset(
-    #     "Faculty_by_university_or_college_in_Canada-Computer_scientists_by_field_of_research-0-3")
-
-    # This hypergraph does not 'cheat' - every computer scientist is included in the dataset. Our algorithm is capable
-    # of recovering the known underlying structure. (The clique algorithm can also uncover the structure).
+    # Our algorithm is capable of recovering the known underlying structure in the following graph.
     categories_dataset = datasets.WikipediaCategoriesDataset(
         "faculty-Computer_scientists_by_field_of_research")
 
-    # This dataset does not particularly work
-    # categories_dataset = datasets.WikipediaCategoriesDataset(
-    #     "bioinformatics")
-
     # Run the diffusion algorithm
-    for left_set, right_set in hypalgorithms.find_max_cut(categories_dataset.hypergraph, return_each_pair=True,
+    for left_set, right_set in hypalgorithms.find_max_cut(categories_dataset.hypergraph, return_each_pair=False,
                                                           algorithm='diffusion'):
-        categories_dataset.log_two_sets(left_set, right_set)
+        categories_dataset.log_confusion_matrix([left_set, right_set])
+        categories_dataset.show_clustering_stats([left_set, right_set])
+
+    # Run the clique algorithm
+    for left_set, right_set in hypalgorithms.find_max_cut(categories_dataset.hypergraph, return_each_pair=False,
+                                                          algorithm='clique'):
+        categories_dataset.log_confusion_matrix([left_set, right_set])
+        categories_dataset.show_clustering_stats([left_set, right_set])
 
 
 def dblp_experiment():
@@ -531,20 +526,23 @@ def nlp_experiment():
 def treebank_experiment():
     """Run experiments with the Penn-Treebank dataset."""
     # Start by loading the dataset
-    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=50, max_degree=100,
+    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=50, max_degree=float('inf'),
                                                     categories_to_use=["Verb", "Adverb"])
 
     # Run the approximate diffusion algorithm
-    for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph, return_each_pair=True,
+    for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph,
+                                                  return_each_pair=False,
                                                   algorithm='diffusion'):
-        treebank_dataset.log_multiple_clusters([left, right])
         treebank_dataset.log_confusion_matrix([left, right])
+        treebank_dataset.show_clustering_stats([left, right])
 
-    # Run the exact diffusion algorithm
-    for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph, return_each_pair=True, approximate=False,
-                                                  algorithm='diffusion'):
-        treebank_dataset.log_multiple_clusters([left, right])
-        treebank_dataset.log_confusion_matrix([left, right])
+
+def induced_graph_demo():
+    """Produce some example induced graphs from the diffusion process."""
+    edges = [[0, 1, 2], [1, 3, 4], [2, 3, 5], [3, 4, 5]]
+    hypergraph = lightgraphs.LightHypergraph(edges)
+    s = [1, 0, 0, 0, 0, 0]
+    hypalgorithms._internal_bipartite_diffusion(s, hypergraph, 100, 0.1, False, construct_induced=True)
 
 
 if __name__ == "__main__":
@@ -554,6 +552,9 @@ if __name__ == "__main__":
     # dblp_experiment()
     treebank_experiment()
 
-    # Run some synthetic experiments
+    # Synthetic experiments
     # sbm_experiments()
     # sbm_runtime_experiment(1000, 5, 1e-9)
+
+    # Demonstration to help build the figures in the paper.
+    # induced_graph_demo()

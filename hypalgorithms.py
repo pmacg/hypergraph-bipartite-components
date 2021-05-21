@@ -8,7 +8,8 @@ import hypreductions
 import hyplogging
 
 
-def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_size, approximate):
+def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_size, approximate,
+                                  construct_induced=False):
     """
     Internal method for running the bipartite diffusion algorithm.
     :param starting_vector: the starting vector of the diffusion process
@@ -16,11 +17,13 @@ def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_si
     :param max_time: the maximum diffusion time
     :param step_size: the step size for the diffusion
     :param approximate: whether to run the approximate version of the diffusion process
+    :param construct_induced: Whether to construct and report the induced graph at each step of the diffusion
     :return: the sets L and R, and their bipartiteness
     """
     # Compute the diffusion process until convergence
     measure_vector, _, _ = hypmc.sim_mc_heat_diff(starting_vector, hypergraph, max_time=max_time, min_step=step_size,
-                                                  plot_diff=False, check_converged=True, approximate=approximate)
+                                                  plot_diff=False, check_converged=True, approximate=approximate,
+                                                  construct_induced=construct_induced)
 
     # Perform the sweep set algorithm on the measure vector to find the almost-bipartite set
     vertex_set_l, vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(measure_vector, hypergraph)
@@ -30,7 +33,7 @@ def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_si
 
 
 def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_random_initialisation=False,
-                                 approximate=True):
+                                 approximate=True, construct_induced=False):
     """
     Given a hypergraph, use the diffusion process to find an almost bipartite set.
     :param hypergraph: The hypergraph on which to find a bipartite set
@@ -39,6 +42,7 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
     :param use_random_initialisation: By default, we will use the eigenvector of the clique graph to initialise. If this
                                       parameter is true, then we will use a random vector to initialise the diffusion.
     :param approximate: Whether to use the approximate, no-LP version of the diffusion operator
+    :param construct_induced: Whether to construct and report the induced graph at each step of the diffusion process
     :return: the sets L, and R, and the bipartiteness value beta(L, R)
     """
     # If the hypergraph does not contain any nodes, then just return empty sets
@@ -59,7 +63,7 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
 
             # Run the diffusion process
             this_vertex_set_l, this_vertex_set_r, this_bipartiteness = _internal_bipartite_diffusion(
-                s, hypergraph, max_time, step_size, approximate)
+                s, hypergraph, max_time, step_size, approximate, construct_induced=construct_induced)
 
             # Check if this is the best one so far
             if this_bipartiteness < best_bipartiteness:
@@ -80,7 +84,8 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
         eigenvalues, eigenvectors = sp.sparse.linalg.eigs(l_clique, k=1, which='SM')
         s = eigenvectors[:, 0]
 
-        return _internal_bipartite_diffusion(s, hypergraph, max_time, step_size, approximate)
+        return _internal_bipartite_diffusion(s, hypergraph, max_time, step_size, approximate,
+                                             construct_induced=construct_induced)
 
 
 def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algorithm="diffusion",
@@ -98,6 +103,7 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
                              complete cut.
     :return:
     """
+    hyplogging.logger.info(f"Finding max cut. Method: {algorithm}. Returning each pair: {return_each_pair}.")
     left_set = []
     right_set = []
     unclassified_nodes = hypergraph.nodes
@@ -151,7 +157,7 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
         unclassified_nodes = [i for i in hypergraph.nodes if i not in left_set and i not in right_set]
 
     if not return_each_pair:
-        return left_set, right_set
+        yield left_set, right_set
 
 
 def check_cluster_pairs(clusters, hypergraph, max_time=100, step_size=0.1, use_random_initialisation=False,
