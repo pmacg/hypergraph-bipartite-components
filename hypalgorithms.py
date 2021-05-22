@@ -194,11 +194,9 @@ def check_cluster_pairs(clusters, hypergraph, max_time=100, step_size=0.1, use_r
 
                 # Run the diffusion
                 if induced_hypergraph.num_vertices > 0:
-                    candidate_induced_l, candidate_induced_r, _ = find_bipartite_set_diffusion(induced_hypergraph,
-                                                                                               max_time=max_time,
-                                                                                               step_size=step_size,
-                                                                                               use_random_initialisation=use_random_initialisation,
-                                                                                               approximate=approximate)
+                    candidate_induced_l, candidate_induced_r, _ = find_bipartite_set_diffusion(
+                        induced_hypergraph, max_time=max_time, step_size=step_size,
+                        use_random_initialisation=use_random_initialisation, approximate=approximate)
                     candidate_l = [both_clusters[v] for v in candidate_induced_l]
                     candidate_r = [both_clusters[v] for v in candidate_induced_r]
 
@@ -249,10 +247,9 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
 
             # Run the diffusion on this hypergraph.
             if induced_hypergraph.num_vertices > 0:
-                cluster_l, cluster_r, _ = find_bipartite_set_diffusion(induced_hypergraph, max_time=max_time,
-                                                                       step_size=step_size,
-                                                                       use_random_initialisation=use_random_initialisation,
-                                                                       approximate=approximate)
+                cluster_l, cluster_r, _ = find_bipartite_set_diffusion(
+                    induced_hypergraph, max_time=max_time, step_size=step_size,
+                    use_random_initialisation=use_random_initialisation, approximate=approximate)
 
                 # Add the found clusters to the new list. Recall that the vertex indices in the induced hypergraph are
                 # equal to the vertex indices in the list 'cluster'.

@@ -5,6 +5,7 @@ The intention is to give a lightweight, minimal structure which should allow fas
 """
 import scipy as sp
 import scipy.sparse
+import numpy as np
 import hypernetx as hnx
 import math
 
@@ -44,6 +45,9 @@ class LightHypergraph(object):
     def degree(self, vertex):
         return self.degrees[vertex]
 
+    def average_rank(self):
+        return np.mean(list(map(len, self.edges)))
+
     def number_of_nodes(self):
         return self.num_vertices
 
@@ -54,12 +58,13 @@ class LightHypergraph(object):
         """Return a hypernetx graph which is equivalent to this hypergraph."""
         return hnx.Hypergraph(self.edges)
 
-    def induced_hypergraph(self, node_list):
+    def induced_hypergraph(self, node_list, remove_edges=False):
         """
         Construct the hypergraph induced by the given nodes. The node indices in the induced graph will equal their
         index in the given list.
 
         :param node_list:
+        :param remove_edges: Whether to remove edges containing any of the removed nodes completely from the hypergraph
         :return:
         """
         # The given list should have unique elements
@@ -70,8 +75,12 @@ class LightHypergraph(object):
         new_edges = []
         for edge in self.edges:
             # We keep the subset of each edge which is incident on the new vertex set
-            if len(node_list_set.intersection(edge)) > 1:
+            if not remove_edges and len(node_list_set.intersection(edge)) > 1:
                 new_edges.append([node_list.index(v) for v in node_list_set.intersection(edge)])
+
+            # Otherwise, we keep only edges entirely inside the remaining node list
+            elif remove_edges and len(node_list_set.intersection(edge)) == len(edge):
+                new_edges.append([node_list.index(v) for v in edge])
 
         # Construct the new hypergraph and return it
         return LightHypergraph(new_edges)

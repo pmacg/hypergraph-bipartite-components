@@ -496,12 +496,6 @@ def wikipedia_categories_experiment():
         categories_dataset.log_confusion_matrix([left_set, right_set])
         categories_dataset.show_clustering_stats([left_set, right_set])
 
-    # Run the clique algorithm
-    for left_set, right_set in hypalgorithms.find_max_cut(categories_dataset.hypergraph, return_each_pair=False,
-                                                          algorithm='clique'):
-        categories_dataset.log_confusion_matrix([left_set, right_set])
-        categories_dataset.show_clustering_stats([left_set, right_set])
-
 
 def dblp_experiment():
     """Run experiments with the DBLP dataset."""
@@ -527,8 +521,17 @@ def nlp_experiment():
 def treebank_experiment():
     """Run experiments with the Penn-Treebank dataset."""
     # Start by loading the dataset
-    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=20, max_degree=float('inf'),
-                                                    categories_to_use=["Verb", "Adverb"])
+    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=10, max_degree=float('inf'),
+                                                    categories_to_use=["Verb", "Adverb", "Adjective"],
+                                                    allow_proper_nouns=True)
+
+    gt_1 = treebank_dataset.get_cluster(0)
+    gt_2 = treebank_dataset.get_cluster(1)
+    bad_words = [e for e in treebank_dataset.hypergraph.edges if
+                 len(set(gt_1).intersection(e)) == 0 or len(set(gt_2).intersection(e)) == 0]
+    print(
+        f"Bipartiteness of ground truth: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, gt_1, gt_2)}")
+    print(f"Average rank of hypergraph: {treebank_dataset.hypergraph.average_rank()}")
 
     # Run the approximate diffusion algorithm
     for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph,
@@ -536,13 +539,7 @@ def treebank_experiment():
                                                   algorithm='diffusion'):
         treebank_dataset.log_confusion_matrix([left, right])
         treebank_dataset.show_clustering_stats([left, right])
-
-    # Run the clique algorithm
-    for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph,
-                                                  return_each_pair=False,
-                                                  algorithm='clique'):
-        treebank_dataset.log_confusion_matrix([left, right])
-        treebank_dataset.show_clustering_stats([left, right])
+        print(f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
 
 
 def induced_graph_demo():
@@ -557,8 +554,8 @@ if __name__ == "__main__":
     # Real-world experiments
     # wikipedia_categories_experiment()
     # actor_director_experiment()
-    dblp_experiment()
-    # treebank_experiment()
+    # dblp_experiment()
+    treebank_experiment()
 
     # Synthetic experiments
     # sbm_experiments()

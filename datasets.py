@@ -68,6 +68,10 @@ class Dataset(object):
         # Construct and return the hypergraph
         return lightgraphs.LightHypergraph(hypergraph_edges)
 
+    def get_cluster(self, cluster_idx):
+        """Return a list of the vertices in the dataset hypergraph which are in the given cluster."""
+        return [i for i in range(len(self.gt_clusters)) if self.gt_clusters[i] == cluster_idx]
+
     @staticmethod
     def load_list_from_file(filename):
         """
@@ -272,16 +276,17 @@ class Dataset(object):
         for i in sorted_degrees:
             hyplogging.logger.info(f"{self.vertex_labels[i]: >{max_label_size}}: {self.hypergraph.degree(i)}")
 
-    def remove_nodes(self, nodes_to_remove):
+    def remove_nodes(self, nodes_to_remove, remove_edges=False):
         """
         Given a list of node indices, remove them from the dataset
         :param nodes_to_remove:
+        :param remove_edges: Whether to remove edges containing these nodes completely from the graph
         :return:
         """
         # Update the hypergraph, num_vertices and num_edges
         old_node_number = self.hypergraph.number_of_nodes()
         remaining_nodes = [node for node in range(old_node_number) if node not in nodes_to_remove]
-        self.hypergraph = self.hypergraph.induced_hypergraph(remaining_nodes)
+        self.hypergraph = self.hypergraph.induced_hypergraph(remaining_nodes, remove_edges=remove_edges)
         self.num_edges = self.hypergraph.num_edges
         self.num_vertices = self.hypergraph.num_vertices
 
@@ -294,7 +299,7 @@ class Dataset(object):
 
         # At the moment, we are not able to update the edge labels.
         if len(self.edge_labels) > 0:
-            hyplogging.logger.warning("NOT ABLE TO UPDATE EDGE LABELS")
+            hyplogging.logger.error("NOT ABLE TO UPDATE EDGE LABELS")
 
     def load_data(self):
         """
@@ -993,7 +998,8 @@ class NlpDataset(Dataset):
 class PennTreebankDataset(Dataset):
     """Load the part-of-speech tagging dataset."""
 
-    def __init__(self, n=float('inf'), min_degree=8, max_degree=float('inf'), categories_to_use=None):
+    def __init__(self, n=float('inf'), min_degree=8, max_degree=float('inf'), categories_to_use=None,
+                 allow_proper_nouns=True):
         """Take an argument specifying how many adjacent words to consider."""
         if categories_to_use is None:
             categories_to_use = ["Adverb", "Verb"]
@@ -1001,8 +1007,11 @@ class PennTreebankDataset(Dataset):
         self.min_degree = min_degree
         self.max_degree = max_degree
 
+        noun_categories = ['NN', 'NNS']
+        if allow_proper_nouns:
+            noun_categories.extend(['NNP', 'NNPS'])
         category_poss = {"Adjective": ['JJ', 'JJR', 'JJS'],
-                         "Noun": ['NN', 'NNS', 'NNP', 'NNPS'],
+                         "Noun": noun_categories,
                          "Adverb": ['RB', 'RBR', 'RBS'],
                          "Verb": ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']}
 
@@ -1011,6 +1020,9 @@ class PennTreebankDataset(Dataset):
         self.pos_to_ignore = {'CC', 'CD', 'DT', 'EX', 'FW', 'IN', 'LS', 'MD', 'PDT', 'POS', 'PRP', 'PRP$', 'RP', 'SYM',
                               'TO', 'UH', 'WDT', 'WP', 'WP$', 'WRB', ',', '.', '$', '``', "''", ':', '-LRB-', '-RRB-',
                               '#'}
+        if not allow_proper_nouns:
+            self.pos_to_ignore.add('NNP')
+            self.pos_to_ignore.add('NNPS')
         for category, poss in category_poss.items():
             if category not in categories_to_use:
                 self.pos_to_ignore = self.pos_to_ignore.union(poss)
@@ -1021,6 +1033,9 @@ class PennTreebankDataset(Dataset):
             if category in categories_to_use:
                 for pos in poss:
                     self.pos_to_cluster[pos] = categories_to_use.index(category)
+
+        # We will construct a list of readable edges in the hypergraph
+        self.readable_edges = []
 
         # Load the hypergraph
         super().__init__()
@@ -1047,29 +1062,38 @@ class PennTreebankDataset(Dataset):
                     word, pos = line.strip().split()
                     current_sentence.append((word, pos))
 
-    def get_ngrams(self, sentence):
+    def get_ngrams(self, sentence, stopwords=None, max_num=float('inf'), return_short_sentences=True):
         """
         Given a sentence, return the n-grams from the sentence.
 
         Combine adjacent proper nouns.
+
+        :param sentence: The sentence on which to operate
+        :param stopwords: If provided, will consider only words in the allowed parts of speech, and not in the stopwords
+        :param max_num: The maximum number of n-grams to return, from the beginning of the sentence
+        :param return_short_sentences: Whether we should return the sentence if it is shorter than n
         """
         current_ngram = []
         returned_any = False
+        returned_so_far = 0
         for word, pos in sentence:
-            # Combine proper nouns
-            if pos in ['NNP', 'NNPS'] and len(current_ngram) > 0 and current_ngram[-1][1] in ['NNP', 'NNPS']:
-                new_word = current_ngram[-1][0] + ' ' + word
-                current_ngram.pop()
-                current_ngram.append((new_word, pos))
-            else:
-                current_ngram.append((word, pos))
-            if len(current_ngram) == self.n:
+            # Combine proper nouns - get the 'word' to add to the ngram
+            if stopwords is None or (pos not in self.pos_to_ignore and word not in stopwords):
+                if pos in ['NNP', 'NNPS'] and len(current_ngram) > 0 and current_ngram[-1][1] in ['NNP', 'NNPS']:
+                    new_word = current_ngram[-1][0] + ' ' + word
+                    current_ngram.pop()
+                    current_ngram.append((new_word, pos))
+                else:
+                    current_ngram.append((word, pos))
+
+            if len(current_ngram) == self.n and returned_so_far < max_num:
                 yield current_ngram
                 current_ngram.pop(0)
                 returned_any = True
+                returned_so_far += 1
 
         # If we did not return any ngrams at all, return the whole sentence.
-        if not returned_any:
+        if not returned_any and return_short_sentences:
             yield current_ngram
 
     def load_data(self):
@@ -1083,26 +1107,32 @@ class PennTreebankDataset(Dataset):
         words_to_indices = {}
         node_degrees = []
         next_index = 0
-        stopwords = set(nltk.corpus.stopwords.words('english') + ['%', "n't", "'s", "mr.", 'q'])
+        swords = set(nltk.corpus.stopwords.words('english') + ['%', "n't", "'s", "mr.", 'q'])
+        swords = []
         for sentence in self.get_sentences_from_processed_treebank(treebank_filename):
-            for ngram in self.get_ngrams(sentence):
+            for ngram in self.get_ngrams(sentence, stopwords=None, max_num=float('inf'), return_short_sentences=True):
                 # Keep only the words of the allowed parts of speech and not in the list of stopwords
                 filtered_ngram =\
-                    [(word.lower(), self.pos_to_cluster[pos]) for word, pos in ngram if (pos not in self.pos_to_ignore
-                     and word not in stopwords)]
+                    [(word.lower(), pos) for word, pos in ngram if (pos not in self.pos_to_ignore
+                     and word not in swords)]
+
+                # Get the gt clusters which are included in this n-gram
+                ngram_gts = [self.pos_to_cluster[pos] for _, pos in filtered_ngram]
 
                 if len(filtered_ngram) >= 2:
                     # Add each word to the graph if not there already, and construct the new edge list
+                    self.readable_edges.append(filtered_ngram)
                     this_edge = []
-                    for word, cluster_idx in filtered_ngram:
-                        if word not in words_to_indices:
-                            words_to_indices[word] = next_index
+                    for word, pos in filtered_ngram:
+                        word_repr = f"{word}_{pos}"
+                        if word_repr not in words_to_indices:
+                            words_to_indices[word_repr] = next_index
                             next_index += 1
-                            self.vertex_labels.append(word)
-                            self.gt_clusters.append(cluster_idx)
+                            self.vertex_labels.append(word_repr)
+                            self.gt_clusters.append(self.pos_to_cluster[pos])
                             node_degrees.append(0)
-                        this_edge.append(words_to_indices[word])
-                        node_degrees[words_to_indices[word]] += 1
+                        this_edge.append(words_to_indices[word_repr])
+                        node_degrees[words_to_indices[word_repr]] += 1
                     edges.append(this_edge)
 
         # Now, construct the hypergraph, and we're done!
@@ -1111,7 +1141,7 @@ class PennTreebankDataset(Dataset):
         # Remove all noes with small degrees
         nodes_to_remove = [node for node in range(len(node_degrees)) if (node_degrees[node] < self.min_degree or
                                                                          node_degrees[node] > self.max_degree)]
-        self.remove_nodes(nodes_to_remove)
+        self.remove_nodes(nodes_to_remove, remove_edges=True)
         self.is_loaded = True
 
 
