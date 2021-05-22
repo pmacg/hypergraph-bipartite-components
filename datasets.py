@@ -214,9 +214,11 @@ class Dataset(object):
         # Construct the confusion matrix
         confusion_matrix = []
         gt_cluster_totals = [0] * len(self.cluster_labels)
+        total_correctly_classified = 0
         for cluster_id, cluster in enumerate(clusters):
             overlaps = [cluster_overlap(cluster, gt) for gt in range(len(self.cluster_labels))]
             confusion_matrix.append(overlaps)
+            total_correctly_classified += max(overlaps)
 
             # Update the cluster totals
             gt_cluster_totals = [gt_cluster_totals[i] + overlaps[i] for i in range(len(self.cluster_labels))]
@@ -253,6 +255,11 @@ class Dataset(object):
             hyplogging.logger.info(f"    Precision: {best_precision}")
             hyplogging.logger.info(f"       Recall: {best_recall}")
             hyplogging.logger.info(f"           F1: {f1_score}")
+
+        # Print the overall Accuracy
+        accuracy = total_correctly_classified / sum(gt_cluster_totals)
+        hyplogging.logger.info(f"Accuracy:")
+        hyplogging.logger.info(f"  {total_correctly_classified} / {sum(gt_cluster_totals)} = {accuracy}")
 
     def show_large_and_small_degree_vertices(self):
         """
@@ -910,6 +917,10 @@ class DblpDataset(Dataset):
 
     def load_data(self):
         hyplogging.logger.info(f"Loading DBLP dataset with nodes {self.nodes}")
+
+        # The cluster labels are the names of the node types
+        self.cluster_labels = self.nodes
+
         # Start by constructing the vertex set of the hypergraph.
         # We will store this as a dictionary of dictionaries. The top level is the different configured node types.
         # The second level is the name of the node to the node index.
@@ -918,7 +929,7 @@ class DblpDataset(Dataset):
         # node. The indices in the files do not start at 0.
         file_index_to_internal = {node_type: {} for node_type in self.nodes}
         next_node_index = 0
-        for node_type in self.nodes:
+        for cluster_idx, node_type in enumerate(self.nodes):
             new_vertex_labels, file_index_to_internal[node_type], next_node_index =\
                 self.load_nodes_from(f"data/dblp/{node_type}.txt", next_node_index)
 
@@ -927,6 +938,9 @@ class DblpDataset(Dataset):
                 self.vertex_labels.extend([f"Paper: {label[:15]}..." for label in new_vertex_labels])
             else:
                 self.vertex_labels.extend(new_vertex_labels)
+
+            # Add the ground truth clusters
+            self.gt_clusters.extend([cluster_idx] * len(new_vertex_labels))
 
         # Now, we construct the hyperedges. We will build a dictionary from the ID of the paper to the node of every
         # vertex in the corresponding edge.

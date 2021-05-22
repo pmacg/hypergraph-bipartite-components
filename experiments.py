@@ -510,7 +510,8 @@ def dblp_experiment():
 
     # Run the diffusion algorithm
     clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=2, approximate=True)
-    dblp_dataset.log_multiple_clusters(clusters)
+    dblp_dataset.log_confusion_matrix(clusters)
+    dblp_dataset.show_clustering_stats(clusters)
 
 
 def nlp_experiment():
@@ -526,13 +527,20 @@ def nlp_experiment():
 def treebank_experiment():
     """Run experiments with the Penn-Treebank dataset."""
     # Start by loading the dataset
-    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=50, max_degree=float('inf'),
+    treebank_dataset = datasets.PennTreebankDataset(n=4, min_degree=20, max_degree=float('inf'),
                                                     categories_to_use=["Verb", "Adverb"])
 
     # Run the approximate diffusion algorithm
     for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph,
                                                   return_each_pair=False,
                                                   algorithm='diffusion'):
+        treebank_dataset.log_confusion_matrix([left, right])
+        treebank_dataset.show_clustering_stats([left, right])
+
+    # Run the clique algorithm
+    for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph,
+                                                  return_each_pair=False,
+                                                  algorithm='clique'):
         treebank_dataset.log_confusion_matrix([left, right])
         treebank_dataset.show_clustering_stats([left, right])
 
@@ -549,8 +557,8 @@ if __name__ == "__main__":
     # Real-world experiments
     # wikipedia_categories_experiment()
     # actor_director_experiment()
-    # dblp_experiment()
-    treebank_experiment()
+    dblp_experiment()
+    # treebank_experiment()
 
     # Synthetic experiments
     # sbm_experiments()
