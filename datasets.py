@@ -41,6 +41,37 @@ class Dataset(object):
         # Load the data at initialisation time
         self.load_data()
 
+    def combine_clusters(self, cluster_id1, cluster_id2, new_cluster_name):
+        """
+        Combine two existing clusters into a single cluster with the given name.
+        """
+        # We will need to re-map all clusters just to make sure the cluster indices still work
+        old_cluster_to_new = {}
+        new_cluster_labels = []
+        new_cluster_id = None
+        next_id = 0
+        for cluster_id in range(len(self.cluster_labels)):
+            if cluster_id not in [cluster_id1, cluster_id2]:
+                # This is a cluster not to be renamed - give it a new index
+                old_cluster_to_new[cluster_id] = next_id
+                next_id += 1
+                new_cluster_labels.append(self.cluster_labels[cluster_id])
+            else:
+                # This cluster is being renamed
+                if new_cluster_id is None:
+                    new_cluster_id = next_id
+                    next_id += 1
+                    new_cluster_labels.append(new_cluster_name)
+                old_cluster_to_new[cluster_id] = new_cluster_id
+
+        # Now, update the cluster labels
+        self.cluster_labels = new_cluster_labels
+
+        # Update the ground truth clusters, and we're done
+        new_gt = [old_cluster_to_new[i] for i in self.gt_clusters]
+        self.gt_clusters = new_gt
+
+
     @staticmethod
     def load_hypergraph_from_edgelist(filename, zero_indexed=True):
         """
@@ -996,7 +1027,8 @@ class NlpDataset(Dataset):
 
 
 class PennTreebankDataset(Dataset):
-    """Load the part-of-speech tagging dataset."""
+    """Load the part-of-speech tagging dataset. We assume that the dataset has already been pre-processed with
+    https://github.com/hankcs/TreebankPreprocessing."""
 
     def __init__(self, n=float('inf'), min_degree=8, max_degree=float('inf'), categories_to_use=None,
                  allow_proper_nouns=True):
@@ -1044,23 +1076,31 @@ class PennTreebankDataset(Dataset):
         self.cluster_labels = categories_to_use
 
     @staticmethod
-    def get_sentences_from_processed_treebank(filename):
+    def get_sentences_from_processed_treebank(filenames):
         """
-        Given a file containing the processed treebank data, return each sentence as a list of (word, pos) pairs.
-        :param filename:
+        Given a list of files containing the processed treebank data, return each sentence as a list of (word, pos)
+        pairs.
+        :param filenames:
         :return:
         """
-        with open(filename, 'r') as f_in:
-            current_sentence = []
-            for line in f_in:
-                if len(line.strip()) == 0:
-                    # If the line is empty, return the current sentence and reset
-                    yield current_sentence
-                    current_sentence = []
-                else:
-                    # Otherwise, add this word to the sentence.
-                    word, pos = line.strip().split()
-                    current_sentence.append((word, pos))
+        total_sentences = 0
+        total_words = 0
+        for filename in filenames:
+            with open(filename, 'r') as f_in:
+                current_sentence = []
+                for line in f_in:
+                    if len(line.strip()) == 0:
+                        # If the line is empty, return the current sentence and reset
+                        yield current_sentence
+                        current_sentence = []
+                        total_sentences += 1
+                    else:
+                        # Otherwise, add this word to the sentence.
+                        word, pos = line.strip().split()
+                        current_sentence.append((word, pos))
+                        total_words += 1
+        hyplogging.logger.info(
+            f"There are {total_sentences} sentences and {total_words} words in the Treebank dataset.")
 
     def get_ngrams(self, sentence, stopwords=None, max_num=float('inf'), return_short_sentences=True):
         """
@@ -1100,7 +1140,10 @@ class PennTreebankDataset(Dataset):
         """Read in the dataset from the preprocessed file."""
         hyplogging.logger.info(
             f"Loading the Penn-Treebank dataset using {str(self.n) if self.n < 10000 else 'inf'}-grams.")
-        treebank_filename = "data/nlp/penn-treebank/train.tsv"
+        # treebank_filenames = ["data/nlp/penn-treebank/train.tsv",
+        #                       "data/nlp/penn-treebank/dev.tsv",
+        #                       "data/nlp/penn-treebank/test.tsv"]
+        treebank_filenames = ["data/nlp/penn-treebank/train.tsv"]
 
         # Construct the hypergraph
         edges = []
@@ -1109,7 +1152,7 @@ class PennTreebankDataset(Dataset):
         next_index = 0
         swords = set(nltk.corpus.stopwords.words('english') + ['%', "n't", "'s", "mr.", 'q'])
         swords = []
-        for sentence in self.get_sentences_from_processed_treebank(treebank_filename):
+        for sentence in self.get_sentences_from_processed_treebank(treebank_filenames):
             for ngram in self.get_ngrams(sentence, stopwords=None, max_num=float('inf'), return_short_sentences=True):
                 # Keep only the words of the allowed parts of speech and not in the list of stopwords
                 filtered_ngram =\
