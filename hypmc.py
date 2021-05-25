@@ -354,20 +354,27 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
 
                 # Add the nodes in the set E_T^+ and E_T^-
                 for e, e_info in edge_info.items():
-                    if len(set(best_p).intersection(e_info[3])) > 0:
+                    if len(set(best_p).intersection(e_info[0])) > 0 or len(set(best_p).intersection(e_info[1])) > 0:
                         edge_name = 'e' + str(e)
                         flow_graph.add_node(edge_name)
 
+                        # Calculate the weight to add for this edge to the flow graph
+                        # Usually, this is the value of \Delta_f(e), but if the edge contains only vertices inside P,
+                        # then we should double this since the edge is in both S_P and I_P.
+                        edge_weight = abs(e_info[2])
+                        if len(set(e_info[3]).difference(best_p)) == 0:
+                            edge_weight *= 2
+
                         if e_info[2] < 0:
                             # This edge is in E_T^+
-                            flow_graph.add_edge('s', edge_name, capacity=abs(round(e_info[2], 4)))
+                            flow_graph.add_edge('s', edge_name, capacity=edge_weight)
                             for v in best_p:
                                 if v in e_info[3]:
                                     # Infinite capacity
                                     flow_graph.add_edge(edge_name, v)
                         else:
                             # This edge is in E_T^-
-                            flow_graph.add_edge(edge_name, 't', capacity=round(e_info[2], 4))
+                            flow_graph.add_edge(edge_name, 't', capacity=edge_weight)
                             for v in best_p:
                                 if v in e_info[3]:
                                     # Infinite capacity
@@ -401,6 +408,7 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
     # Now, construct the induced graph
     if construct_induced:
         induced_graph = nx.Graph()
+        induced_graph_edges = {}
 
         # Add the vertices
         for v in hypergraph.nodes:
@@ -419,19 +427,25 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
             i_e = []
             s_e = []
             for vertex, weight in weights.items():
-                flow_graph.add_node(vertex)
+                # Get the weight of this edge to be added to the flow graph
+                # ordinarily, this will be the full weight given by weight. However, if the vertex appears in both S(e)
+                # and I(e), then we need to divide by two.
+                flow_weight = abs(weight) if not (vertex in e_info[0] and vertex in e_info[1]) else abs(weight) / 2
+
                 if vertex in e_info[0]:
                     # This vertex is in I(e)
-                    flow_graph.add_edge(vertex, 't', capacity=abs(weight))
+                    flow_graph.add_node(f"{vertex}_i")
+                    flow_graph.add_edge(f"{vertex}_i", 't', capacity=flow_weight)
                     i_e.append(vertex)
-                else:
+                if vertex in e_info[1]:
                     # This vertex is in S(e)
-                    flow_graph.add_edge('s', vertex, capacity=abs(weight))
+                    flow_graph.add_node(f"{vertex}_s")
+                    flow_graph.add_edge('s', f"{vertex}_s", capacity=flow_weight)
                     s_e.append(vertex)
             for v in i_e:
                 for u in s_e:
                     # Add an infinite capacity edge between the vertices in s(e), i(e)
-                    flow_graph.add_edge(u, v)
+                    flow_graph.add_edge(f"{u}_s", f"{v}_i")
 
             # Solve the flow problem, and add the weights to the induced graph
             flow_value, flow_solution = nx.maximum_flow(flow_graph, 's', 't')
@@ -440,10 +454,20 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
                     if v in ['s', 't'] or u in ['s', 't'] or round(flow_value, 4) == 0:
                         continue
                     if round(weight/flow_value, 4) > 0:
-                        induced_graph.add_edge(v, u, weight=round(weight/flow_value, 2))
+                        pair = tuple(sorted((int(v[:-2]), int(u[:-2]))))
+                        if pair not in induced_graph_edges:
+                            induced_graph_edges[pair] = weight/flow_value
+                        else:
+                            induced_graph_edges[pair] += weight/flow_value
+
+        # Add all of the edges to the induced graph
+        for pair, weight in induced_graph_edges.items():
+            induced_graph.add_edge(pair[0], pair[1], weight=round(weight, 2))
 
         # Plot the induced graph
         print(edge_info)
+        print(edge_induced_gradients)
+        print(r)
         print(f)
         hyplap.hyp_plot_with_graph(induced_graph, hypergraph.to_hypernetx(), plot_graph_weights=True)
 
