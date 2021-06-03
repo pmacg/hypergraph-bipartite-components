@@ -5,6 +5,7 @@ import hypernetx as hnx
 import numpy as np
 import numpy.random
 import scipy.special
+import matplotlib.pyplot as plt
 import random
 import math
 import hyplogging
@@ -206,8 +207,6 @@ def hypergraph_sbm_two_cluster(filename, n, r, p, q):
 
 
 if __name__ == "__main__":
-    n = 100
-    r = 4
-    p = 0.001
-    q = 0.001
-    hypergraph_sbm_two_cluster(f"data/sbm/two_cluster_sbm_{n}_{r}_{p}_{q}.edgelist", n, r, p, q)
+    hypergraph = simple_not_two_colorable_hypergraph()
+    hnx.draw(hypergraph.to_hypernetx())
+    plt.show()

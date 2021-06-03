@@ -465,9 +465,6 @@ def weighted_mc_diffusion_gradient(f, hypergraph, debug=False, approximate=False
             induced_graph.add_edge(pair[0], pair[1], weight=round(weight, 2))
 
         # Plot the induced graph
-        print(edge_info)
-        print(edge_induced_gradients)
-        print(r)
         print(f)
         hyplap.hyp_plot_with_graph(induced_graph, hypergraph.to_hypernetx(), plot_graph_weights=True)
 
@@ -806,6 +803,7 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, min_step=0.1, debug=False, plo
 
         # Apply an update step of the diffusion process
         if not approximate:
+            print(t)
             new_xt, this_gt, this_ft, this_negative_log_ft = diffusion_update_step(x_t, hypergraph, step_size,
                                                                                    construct_induced=construct_induced)
         else:

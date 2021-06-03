@@ -1,6 +1,8 @@
 """
 This file implements some experiments on the hypergraph diffusion operator.
 """
+import scipy as sp
+import scipy.sparse.linalg
 import time
 import statistics
 import clsz.cluster
@@ -10,6 +12,7 @@ import hypalgorithms
 import hypcheeg
 import datasets
 import hyplogging
+import hypmc
 import hypreductions
 import lightgraphs
 
@@ -95,12 +98,12 @@ def sbm_experiments():
     average_over = 10
 
     # We will run a few experiments
-    rs = [5]
-    ps = [1e-11]
+    rs = [3]
+    ps = [1e-7]
     run_lps = [False]
 
     # Use the same ratios for each experiment
-    ratios = [0.5 * x for x in range(51, 61)]
+    ratios = [0.5 * x for x in range(61, 101)]
 
     # Whether to append results to the results files
     append_results = True
@@ -377,7 +380,6 @@ def actor_director_experiment():
             dataset.show_clustering_stats([left, right])
 
 
-
 def log_migration_result(filename, migration_dataset, title, left_set, right_set):
     """
     Given a pair of clusters in the migration dataset, display their evaluation, and write it to the output csv file.
@@ -522,6 +524,12 @@ def dblp_experiment():
     dblp_dataset.log_confusion_matrix(clusters)
     dblp_dataset.show_clustering_stats(clusters)
 
+    # Run the clique algorithm
+    clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=2, approximate=True,
+                                                           use_clique_alg=True)
+    dblp_dataset.log_confusion_matrix(clusters)
+    dblp_dataset.show_clustering_stats(clusters)
+
 
 def nlp_experiment():
     """Run the experiment on the NLP dataset."""
@@ -579,13 +587,13 @@ def induced_graph_demo():
 
 if __name__ == "__main__":
     # Real-world experiments
-    wikipedia_categories_experiment()
+    # wikipedia_categories_experiment()
     # actor_director_experiment()
     # dblp_experiment()
     # treebank_experiment()
 
     # Synthetic experiments
-    # sbm_experiments()
+    sbm_experiments()
     # sbm_runtime_experiment(1000, 5, 1e-9)
 
     # Demonstration to help build the figures in the paper.
