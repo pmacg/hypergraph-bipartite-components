@@ -134,4 +134,4 @@ dmypy.json
 # Ignore data directory and log files
 **/data/
 hyplap.log
-
+results/
