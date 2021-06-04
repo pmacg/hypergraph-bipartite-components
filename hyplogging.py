@@ -1,3 +1,6 @@
+"""
+This file configures the logging for this project.
+"""
 import logging
 import sys
 

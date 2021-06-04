@@ -34,45 +34,6 @@ def networkx_volume_in(graph, vertex_set):
     return sum(d for v, d in degree(vertex_set, weight="weight"))
 
 
-def clsz_cut_imbalance(graph, vertex_set_l, vertex_set_r):
-    """
-    Compute the cut imbalance between the sets L and R as specified in CLSZ. This is defined to be
-
-        CI(S, T) = 1/2 * abs[ (w(S, T) - w(T, S)) / (w(S, T) + w(T, S)) ]
-
-    :param graph: the directed graph on which to operate
-    :param vertex_set_l: the set S
-    :param vertex_set_r: the set T
-    :return: the cut imbalance ratio CI(S, T)
-    """
-    hyplogging.logger.debug("Computing cut imbalance.")
-    hyplogging.logger.debug(f"    Left set size: {len(vertex_set_l)}")
-    hyplogging.logger.debug(f"   Right set size: {len(vertex_set_r)}")
-    w_s_t = networkx_directed_cut_size(graph, vertex_set_l, vertex_set_r)
-    w_t_s = networkx_directed_cut_size(graph, vertex_set_r, vertex_set_l)
-    return (1/2) * abs((w_s_t - w_t_s) / (w_s_t + w_t_s))
-
-
-def ms_flow_ratio(graph, vertex_set_l, vertex_set_r):
-    """
-    Compute the flow ratio between the sets L and R as specified by Macgregor and Sun. This is defined to be
-
-        FR(S, T) = 1 - 2 w(S, T) / (vol_out(S) + vol_in(T))
-
-    :param graph:
-    :param vertex_set_l:
-    :param vertex_set_r:
-    :return: the flow ratio FR(S, T)
-    """
-    hyplogging.logger.debug("Computing flow ratio.")
-    hyplogging.logger.debug(f"    Left set size: {len(vertex_set_l)}")
-    hyplogging.logger.debug(f"   Right set size: {len(vertex_set_r)}")
-    w_s_t = networkx_directed_cut_size(graph, vertex_set_l, vertex_set_r)
-    vol_out_s = nx.volume(graph, vertex_set_l, weight="weight")
-    vol_in_t = networkx_volume_in(graph, vertex_set_r)
-    return 1 - 2 * w_s_t / (vol_out_s + vol_in_t)
-
-
 def hypergraph_cut_size(hypergraph, vertex_set):
     """
     Compute the cut size of a set S in a hypergraph.
@@ -309,25 +270,6 @@ def hypergraph_common_edges(u, v, hypergraph):
         if u in e.elements and v in e.elements:
             total += 1
     return total
-
-
-def graph_self_loop_conductance(vertex_set, graph, hypergraph):
-    """
-    Given a graph, assuming that each vertex is given a self loop in order to give the vertex the same degree as it has
-    in H, return the conductance of a set.
-    :param vertex_set: The vertex set to find the conductance of
-    :param graph: The simple graph
-    :param hypergraph: The hypergraph
-    :return: The conductance of the set S in G assuming each vertex has appropriate self-loops
-    """
-    vol_s = hypergraph_volume(hypergraph, vertex_set)
-    vol_s_complement = hypergraph_volume(hypergraph, vertex_set, complement=True)
-    cut_s = nx.cut_size(graph, vertex_set)
-
-    if min(vol_s, vol_s_complement) == 0:
-        return 1
-    else:
-        return cut_s / min(vol_s, vol_s_complement)
 
 
 def hypergraph_weighted_degree(vertex, hypergraph):

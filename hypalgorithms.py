@@ -3,9 +3,10 @@ import numpy as np
 import scipy as sp
 import scipy.sparse.linalg
 import hypcheeg
-import hypmc
+import hypjop
 import hypreductions
 import hyplogging
+import lightgraphs
 
 
 def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_size, approximate,
@@ -21,15 +22,23 @@ def _internal_bipartite_diffusion(starting_vector, hypergraph, max_time, step_si
     :return: the sets L and R, and their bipartiteness
     """
     # Compute the diffusion process until convergence
-    measure_vector, _, _ = hypmc.sim_mc_heat_diff(starting_vector, hypergraph, max_time=max_time, min_step=step_size,
-                                                  plot_diff=False, check_converged=True, approximate=approximate,
-                                                  construct_induced=construct_induced)
+    measure_vector, _, _ = hypjop.sim_mc_heat_diff(starting_vector, hypergraph, max_time=max_time, min_step=step_size,
+                                                   plot_diff=False, check_converged=True, approximate=approximate,
+                                                   construct_induced=construct_induced)
 
     # Perform the sweep set algorithm on the measure vector to find the almost-bipartite set
     vertex_set_l, vertex_set_r = hypcheeg.hypergraph_two_sided_sweep(measure_vector, hypergraph)
     beta = hypcheeg.hypergraph_bipartiteness(hypergraph, vertex_set_l, vertex_set_r)
 
     return vertex_set_l, vertex_set_r, beta
+
+
+def induced_graph_demo():
+    """Produce some example induced graphs from the diffusion process."""
+    edges = [[0, 1, 2], [1, 3, 4], [2, 3, 5], [3, 4, 5]]
+    hypergraph = lightgraphs.LightHypergraph(edges)
+    s = [1, 0, 0, 0, 0, 0]
+    _internal_bipartite_diffusion(s, hypergraph, 100, 0.1, False, construct_induced=True)
 
 
 def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_random_initialisation=False,
@@ -78,7 +87,7 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
         weighted_clique_graph = hypreductions.hypergraph_clique_reduction(hypergraph)
 
         # Compute the operator L = (I + AD^-1) of the clique graph
-        l_clique = hypmc.graph_diffusion_operator(weighted_clique_graph)
+        l_clique = hypjop.graph_diffusion_operator(weighted_clique_graph)
 
         # Compute the eigenvector corresponding to the smallest eigenvalue
         eigenvalues, eigenvectors = sp.sparse.linalg.eigs(l_clique, k=1, which='SM')
@@ -296,7 +305,7 @@ def find_bipartite_set_clique(hypergraph):
 
     # Compute the operator L = (I + AD^-1) of the clique graph
     hyplogging.logger.debug("Computing the clique graph diffusion operator.")
-    l_clique = hypmc.graph_diffusion_operator(weighted_clique_graph)
+    l_clique = hypjop.graph_diffusion_operator(weighted_clique_graph)
 
     # Compute the eigenvector corresponding to the smallest eigenvalue
     hyplogging.logger.debug("Computing the eigenvalues and eigenvectors.")

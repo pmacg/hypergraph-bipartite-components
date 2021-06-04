@@ -157,6 +157,7 @@ def hypergraph_sbm_two_cluster(filename, n, r, p, q):
 
     :param filename:
     :param n:
+    :param r:
     :param p:
     :param q:
     :return:

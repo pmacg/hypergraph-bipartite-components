@@ -537,8 +537,3 @@ def sim_hyp_pagerank(alpha, s, phi0, hypergraph, max_iterations=1000, step=0.01,
             converged = True
             print("\nPagerank converged. Iterations:", total_iterations)
     return x_t
-
-
-def check_pagerank(alpha, pr, hypergraph):
-    test = pr + ((1 - alpha) / (2 * alpha)) * hypergraph_measure_laplacian(pr, hypergraph)
-    print("Pagerank test:", np.round(test, decimals=2))
