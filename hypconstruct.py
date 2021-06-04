@@ -7,7 +7,6 @@ import numpy.random
 import scipy.special
 import matplotlib.pyplot as plt
 import random
-import math
 import hyplogging
 import lightgraphs
 

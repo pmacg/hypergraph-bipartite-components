@@ -1,20 +1,14 @@
 """
 This file implements some experiments on the hypergraph diffusion operator.
 """
-import scipy as sp
-import scipy.sparse.linalg
 import time
 import statistics
-import clsz.cluster
-import clsz.metrics
 import hypconstruct
 import hypalgorithms
 import hypcheeg
 import datasets
 import hyplogging
-import hypjop
 import hypreductions
-import lightgraphs
 
 
 def transpose_lists(lists):
@@ -218,25 +212,6 @@ def test_step_sizes():
                             f_out.flush()
 
 
-def imdb_experiment():
-    hyplogging.logger.info("Loading the imdb dataset.")
-    imdb_dataset = datasets.ImdbDataset()
-    imdb_dataset.use_subgraph("Hugh Grant", degrees_of_separation=2)
-
-    hyplogging.logger.info("Running the diffusion algorithm.")
-    diff_alg_l, diff_alg_r, diff_bipart = hypalgorithms.find_bipartite_set_diffusion(imdb_dataset.hypergraph,
-                                                                                     max_time=100, step_size=1,
-                                                                                     approximate=True)
-    hyplogging.logger.info(f"Diffusion algorithm bipartiteness: {diff_bipart}\n")
-    hyplogging.logger.info(f"   SET 1")
-    hyplogging.logger.info(str([imdb_dataset.vertex_labels[v] for v in diff_alg_l]))
-    hyplogging.logger.info(f"   SET 2")
-    hyplogging.logger.info(str([imdb_dataset.vertex_labels[v] for v in diff_alg_r]))
-
-    imdb_dataset.simple_cluster_check("Left Set", diff_alg_l)
-    imdb_dataset.simple_cluster_check("Right Set", diff_alg_r)
-
-
 def actor_director_experiment():
     """
     Run experiments on the smaller IMDB dataset, looking to distinguish actors and directors.
@@ -320,7 +295,6 @@ def treebank_experiment():
         treebank_dataset.show_clustering_stats([left, right])
         print(f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
 
-
     # Run the clique algorithm
     for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph,
                                                   return_each_pair=False,
@@ -332,14 +306,14 @@ def treebank_experiment():
 
 if __name__ == "__main__":
     # Real-world experiments
-    # treebank_experiment()
-    # dblp_experiment()
-    # wikipedia_categories_experiment()
-    # actor_director_experiment()
+    treebank_experiment()
+    dblp_experiment()
+    wikipedia_categories_experiment()
+    actor_director_experiment()
 
     # Synthetic experiments
     sbm_experiments()
-    # sbm_runtime_experiment(1000, 5, 1e-9)
+    sbm_runtime_experiment(1000, 5, 1e-9)
 
     # Demonstration to help build the figures in the paper.
     hypalgorithms.induced_graph_demo()

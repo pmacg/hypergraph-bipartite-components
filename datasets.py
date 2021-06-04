@@ -3,11 +3,8 @@ This file provides an interface to each dataset we will use for our experiments.
 """
 import re
 
-from scipy.io import loadmat
-from uszipcode import SearchEngine
 import numpy as np
 import networkx as nx
-import random
 import os.path
 import itertools
 import pandas as pd
@@ -668,9 +665,6 @@ class PennTreebankDataset(Dataset):
                 # Keep only the words of the allowed parts of speech and not in the list of stopwords
                 filtered_ngram =\
                     [(word.lower(), pos) for word, pos in ngram if (pos not in self.pos_to_ignore)]
-
-                # Get the gt clusters which are included in this n-gram
-                ngram_gts = [self.pos_to_cluster[pos] for _, pos in filtered_ngram]
 
                 if len(filtered_ngram) >= 2:
                     # Add each word to the graph if not there already, and construct the new edge list
