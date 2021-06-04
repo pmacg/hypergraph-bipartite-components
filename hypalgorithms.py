@@ -112,7 +112,8 @@ def find_max_cut(hypergraph, max_time=100, step_size=0.1, approximate=True, algo
                              complete cut.
     :return:
     """
-    hyplogging.logger.info(f"Finding max cut. Method: {algorithm}. Returning each pair: {return_each_pair}.")
+    hyplogging.logger.info(f"Finding two clusters. Method: {algorithm}.")
+    hyplogging.logger.debug(f"  Returning each pair: {return_each_pair}.")
     left_set = []
     right_set = []
     unclassified_nodes = hypergraph.nodes
@@ -248,7 +249,7 @@ def recursive_bipartite_diffusion(hypergraph, iterations, max_time=100, step_siz
     current_clusters = [hypergraph.nodes]
 
     for i in range(iterations):
-        hyplogging.logger.info(f"Diffusion iteration {i + 1}/{iterations}.")
+        hyplogging.logger.debug(f"Diffusion iteration {i + 1}/{iterations}.")
         new_clusters = []
 
         # For each existing cluster, perform the diffusion algorithm.

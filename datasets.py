@@ -339,6 +339,7 @@ class ActorDirectorDataset(Dataset):
 
     def __init__(self, num_actors=2):
         """Optionally pass the number of actors to include in each hyperedge. Can be a maximum of 3."""
+        hyplogging.logger.info("Loading actor-director dataset.")
         self.num_actors = num_actors
         super().__init__()
 

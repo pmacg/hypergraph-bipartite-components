@@ -217,20 +217,19 @@ def actor_director_experiment():
     Run experiments on the smaller IMDB dataset, looking to distinguish actors and directors.
     :return:
     """
-    # We only consider the case where each edge has one director and two actors
-    for num_actors in [2]:
-        hyplogging.logger.info(f"Using {num_actors} actors.")
-        dataset = datasets.ActorDirectorDataset(num_actors=num_actors)
+    dataset = datasets.ActorDirectorDataset()
 
-        # Run the diffusion algorithm
-        for left, right in hypalgorithms.find_max_cut(dataset.hypergraph):
-            dataset.log_confusion_matrix([left, right])
-            dataset.show_clustering_stats([left, right])
+    # Run the diffusion algorithm
+    for left, right in hypalgorithms.find_max_cut(dataset.hypergraph):
+        dataset.log_confusion_matrix([left, right])
+        dataset.show_clustering_stats([left, right])
 
-        # Run the clique algorithm
-        for left, right in hypalgorithms.find_max_cut(dataset.hypergraph, algorithm='clique'):
-            dataset.log_confusion_matrix([left, right])
-            dataset.show_clustering_stats([left, right])
+    hyplogging.logger.info("")
+
+    # Run the clique algorithm
+    for left, right in hypalgorithms.find_max_cut(dataset.hypergraph, algorithm='clique'):
+        dataset.log_confusion_matrix([left, right])
+        dataset.show_clustering_stats([left, right])
 
 
 def wikipedia_categories_experiment():
@@ -246,6 +245,7 @@ def wikipedia_categories_experiment():
         categories_dataset.show_clustering_stats([left_set, right_set])
 
     # Run the clique algorithm
+    hyplogging.logger.info("")
     for left_set, right_set in hypalgorithms.find_max_cut(categories_dataset.hypergraph, return_each_pair=False,
                                                           algorithm='clique'):
         categories_dataset.log_confusion_matrix([left_set, right_set])
@@ -258,13 +258,40 @@ def dblp_experiment():
     dblp_dataset = datasets.DblpDataset()
 
     # Run the diffusion algorithm
+    hyplogging.logger.info("Finding clusters with diffusion algorithm.")
     clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=2, approximate=True)
+
+    # Combine the clusters with no conference vertices
+    combined_non_conf_cluster = []
+    combined_conf_cluster = []
+    for cluster in clusters:
+        # Check whether the cluster has any conferences in it
+        if len(set(cluster).intersection(dblp_dataset.get_cluster(1))) > 0:
+            combined_conf_cluster.extend(cluster)
+        else:
+            combined_non_conf_cluster.extend(cluster)
+    clusters = [combined_non_conf_cluster, combined_conf_cluster]
+
+    # Show the results
     dblp_dataset.log_confusion_matrix(clusters)
     dblp_dataset.show_clustering_stats(clusters)
 
     # Run the clique algorithm
+    hyplogging.logger.info("")
+    hyplogging.logger.info("Finding clusters with clique algorithm.")
     clusters = hypalgorithms.recursive_bipartite_diffusion(dblp_dataset.hypergraph, iterations=2, approximate=True,
                                                            use_clique_alg=True)
+    # Combine the clusters with no conference vertices
+    combined_non_conf_cluster = []
+    combined_conf_cluster = []
+    for cluster in clusters:
+        # Check whether the cluster has any conferences in it
+        if len(set(cluster).intersection(dblp_dataset.get_cluster(1))) > 0:
+            combined_conf_cluster.extend(cluster)
+        else:
+            combined_non_conf_cluster.extend(cluster)
+    clusters = [combined_non_conf_cluster, combined_conf_cluster]
+
     dblp_dataset.log_confusion_matrix(clusters)
     dblp_dataset.show_clustering_stats(clusters)
 
@@ -279,21 +306,15 @@ def treebank_experiment():
     # Combine the non-verbs
     treebank_dataset.combine_clusters(1, 2, "Non-Verbs")
 
-    gt_1 = treebank_dataset.get_cluster(0)
-    gt_2 = treebank_dataset.get_cluster(1)
-    print(
-        f"Bipartiteness of ground truth: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, gt_1, gt_2)}")
-    print(f"Number of vertices in hypergraph: {treebank_dataset.hypergraph.number_of_nodes()}")
-    print(f"Number of edges in hypergraph: {treebank_dataset.hypergraph.number_of_edges()}")
-    print(f"Average rank of hypergraph: {treebank_dataset.hypergraph.average_rank()}")
-
     # Run the approximate diffusion algorithm
     for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph,
                                                   return_each_pair=False,
                                                   algorithm='diffusion'):
         treebank_dataset.log_confusion_matrix([left, right])
         treebank_dataset.show_clustering_stats([left, right])
-        print(f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
+        hyplogging.logger.info(f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
+
+    hyplogging.logger.info("")
 
     # Run the clique algorithm
     for left, right in hypalgorithms.find_max_cut(treebank_dataset.hypergraph,
@@ -301,19 +322,4 @@ def treebank_experiment():
                                                   algorithm='clique'):
         treebank_dataset.log_confusion_matrix([left, right])
         treebank_dataset.show_clustering_stats([left, right])
-        print(f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
-
-
-if __name__ == "__main__":
-    # Real-world experiments
-    treebank_experiment()
-    dblp_experiment()
-    wikipedia_categories_experiment()
-    actor_director_experiment()
-
-    # Synthetic experiments
-    sbm_experiments()
-    sbm_runtime_experiment(1000, 5, 1e-9)
-
-    # Demonstration to help build the figures in the paper.
-    hypalgorithms.induced_graph_demo()
+        hyplogging.logger.info(f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
