@@ -465,7 +465,7 @@ def weighted_jop_diffusion_gradient(f, hypergraph, debug=False, approximate=Fals
             induced_graph.add_edge(pair[0], pair[1], weight=round(weight, 2))
 
         # Plot the induced graph
-        print(f)
+        hyplogging.logger.info(f"f: {f}")
         hyplap.hyp_plot_with_graph(induced_graph, hypergraph.to_hypernetx(), plot_graph_weights=True)
 
     return r
@@ -803,7 +803,8 @@ def sim_mc_heat_diff(phi, hypergraph, max_time=1, min_step=0.1, plot_diff=False,
 
         # Apply an update step of the diffusion process
         if not approximate:
-            print(t)
+            if construct_induced:
+                hyplogging.logger.info(f"t: {round(t - step_size, 2)}")
             new_xt, this_rq, this_ft, this_negative_log_ft = diffusion_update_step(x_t, hypergraph, step_size,
                                                                                    construct_induced=construct_induced)
         else:
