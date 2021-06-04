@@ -3,7 +3,6 @@ This file provides an interface to each dataset we will use for our experiments.
 """
 import re
 
-import nltk.corpus
 from scipy.io import loadmat
 from uszipcode import SearchEngine
 import numpy as np
@@ -16,7 +15,6 @@ import pickle
 import hyplogging
 import hypconstruct
 import lightgraphs
-from nltk.corpus import stopwords
 
 
 class Dataset(object):
@@ -70,7 +68,6 @@ class Dataset(object):
         # Update the ground truth clusters, and we're done
         new_gt = [old_cluster_to_new[i] for i in self.gt_clusters]
         self.gt_clusters = new_gt
-
 
     @staticmethod
     def load_hypergraph_from_edgelist(filename, zero_indexed=True):
@@ -341,104 +338,6 @@ class Dataset(object):
         pass
 
 
-class CongressCommitteesDataset(Dataset):
-    """The congress committees dataset."""
-
-    def load_data(self):
-        self.load_edgelist_and_labels("data/senate-committees/hyperedges-senate-committees.txt",
-                                      "data/senate-committees/node-names-senate-committees.txt",
-                                      None,
-                                      "data/senate-committees/node-labels-senate-committees.txt",
-                                      "data/senate-committees/label-names-senate-committees.txt",
-                                      vertex_zero_indexed=False,
-                                      clusters_zero_indexed=False)
-        self.is_loaded = True
-
-
-class ImdbDataset(Dataset):
-    """The IMDB credit dataset."""
-
-    def load_data(self):
-        self.load_edgelist_and_labels("data/imdb/credit.edgelist",
-                                      "data/imdb/credit.vertices",
-                                      "data/imdb/credit.edges",
-                                      "data/imdb/credit.gt",
-                                      "data/imdb/credit.clusters",
-                                      vertex_zero_indexed=False,
-                                      clusters_zero_indexed=False)
-        self.is_loaded = True
-
-    def use_subgraph(self, seed_actor, degrees_of_separation=2):
-        """
-        Given a seed actor, truncate the credit hypergraph to use only the nodes with the given degrees of separation
-        of this actor.
-
-        :param seed_actor:
-        :param degrees_of_separation:
-        :return: nothing, updates internal data structure
-        """
-        hyplogging.logger.info(f"Using IMDB with seed {seed_actor} and {degrees_of_separation} degrees of separation.")
-
-        # Keep a record of the previous indices used for each node in the new hypergraph
-        old_indices = {}  # new: old
-        new_indices = {}  # old: new
-
-        # Add the seed actor to the index dictionaries
-        seed_old_index = self.vertex_labels.index(seed_actor)
-        old_indices[0] = seed_old_index
-        new_indices[seed_old_index] = 0
-
-        # Find all of the nodes in the new graph first
-        next_new_index = 1
-        old_indices_in_new_graph = {seed_old_index}
-        for step in range(degrees_of_separation):
-            old_indices_at_start_iter = list(old_indices_in_new_graph)
-            for node in old_indices_at_start_iter:
-                for u in self.hypergraph.neighbours[node]:
-                    if u not in old_indices_in_new_graph:
-                        old_indices_in_new_graph.add(u)
-                        old_indices[next_new_index] = u
-                        new_indices[u] = next_new_index
-                        next_new_index += 1
-
-        # Now, find all of the edges in the hypergraph which will still be in the new hypergraph
-        new_hyperedges = []
-        old_edges_indices = {}
-        next_edge_index = 0
-        for i, edge in enumerate(self.hypergraph.edges):
-            if len(set(edge).intersection(old_indices_in_new_graph)) > 1:
-                # This edge will be in the new graph
-                new_hyperedges.append([new_indices[u] for u in edge if u in old_indices_in_new_graph])
-                old_edges_indices[next_edge_index] = i
-                next_edge_index += 1
-
-        # Set the new hypergraph
-        self.hypergraph = lightgraphs.LightHypergraph(new_hyperedges)
-        self.num_vertices = self.hypergraph.number_of_nodes()
-        self.num_edges = self.hypergraph.number_of_edges()
-        hyplogging.logger.debug(f"Now using {self.num_vertices} vertices and {self.num_edges} edges.")
-
-        # Update the labels
-        self.vertex_labels = [self.vertex_labels[old_indices[u]] for u in range(self.num_vertices)]
-        self.gt_clusters = [self.gt_clusters[old_indices[u]] for u in range(self.num_vertices)]
-        self.edge_labels = [self.edge_labels[old_edges_indices[u]] for u in range(self.num_edges)]
-
-    def simple_cluster_check(self, cluster_name, cluster):
-        """
-        Given some set of vertices, break it down by percentages of each class.
-
-        :param cluster_name:
-        :param cluster:
-        """
-        cluster_size = len(cluster)
-        gts = [self.gt_clusters[u] for u in cluster]
-
-        hyplogging.logger.info(f"{cluster_name} breakdown:")
-        for gt_id, cluster_label in enumerate(self.cluster_labels):
-            proportion = gts.count(gt_id) / cluster_size
-            hyplogging.logger.info(f"   {cluster_label}: {proportion}")
-
-
 class ActorDirectorDataset(Dataset):
     """Create a simple dataset with actor and director information."""
 
@@ -519,202 +418,6 @@ class ActorDirectorDataset(Dataset):
         self.is_loaded = True
 
 
-class FoodWebDataset(Dataset):
-    """The foodweb dataset."""
-
-    def load_data(self):
-        self.load_edgelist_and_labels("data/foodweb/foodweb_hypergraph.edgelist",
-                                      "data/foodweb/foodweb.vertices",
-                                      None,
-                                      "data/foodweb/foodweb.gt",
-                                      "data/foodweb/foodweb.clusters",
-                                      vertex_zero_indexed=False,
-                                      clusters_zero_indexed=False)
-        self.is_loaded = True
-
-
-class FoodWebHFDDataset(Dataset):
-    """The foodweb dataset, as used in the paper "Local HyperFlow Diffusion".
-    See the github project here: https://github.com/s-h-yang/HFD
-    """
-
-    def load_data(self):
-        self.load_edgelist_and_labels("data/foodweb-hfd/foodweb_edges.txt",
-                                      "data/foodweb-hfd/foodweb_species.txt",
-                                      None,
-                                      "data/foodweb-hfd/foodweb_labels.txt",
-                                      None,
-                                      vertex_zero_indexed=False,
-                                      clusters_zero_indexed=False)
-        self.cluster_labels = ["Producers", "Low-level consumers", "High-level consumers"]
-        self.is_loaded = True
-
-
-class MigrationDataset(Dataset):
-    """
-    The Migration dataset. This dataset includes both a hypergraph and the original directed graph for comparison
-    of hypergraph algorithms with directed graph algorithms.
-    """
-
-    def __init__(self):
-        hyplogging.logger.info("Loading migration dataset.")
-        self.directed_graph = None
-        self.zipcodes = None
-        super().__init__()
-
-    def construct_simple_motif_hypergraph(self, directed_adjacency_matrix):
-        """
-        Given the adjacency matrix of the directed migration graph, construct a hypergraph in the following way:
-          - for each vertex, we consider its 'outgoing' neighbours in turn, starting with the largest weight.
-          - we bundle them into groups such that the total weight in each group is at least 0.8
-          - we add a hyperedge for each bundle
-        We throw away small-weighted edges where we cannot sum them to 0.8.
-        """
-        hyplogging.logger.debug("Constructing simple migration hypergraph.")
-        hyperedges = []
-        for vertex in self.directed_graph.nodes:
-            neighbours = list(nx.neighbors(self.directed_graph, vertex))
-            sorted_neighbours = sorted(neighbours, key=(lambda x: directed_adjacency_matrix[vertex, x]))
-
-            # Construct the hyperedges for this vertex
-            new_edge = [vertex]
-            new_edge_weight = 0
-            while len(sorted_neighbours) > 0:
-                u = sorted_neighbours.pop()
-                new_edge.append(u)
-                new_edge_weight += directed_adjacency_matrix[vertex, u]
-
-                if new_edge_weight > 0.8:
-                    hyperedges.append(new_edge)
-                    new_edge = [vertex]
-                    new_edge_weight = 0
-        self.hypergraph = lightgraphs.LightHypergraph(hyperedges)
-        self.num_vertices = self.hypergraph.num_vertices
-        self.num_edges = self.hypergraph.num_edges
-
-    def construct_motif_hypergraph(self, directed_adjacency_matrix):
-        """
-        Given that the directed graph has been loaded already, construct a hypergraph based on the following motif:
-            o --> o
-            \    ^
-             \  /
-              X
-             / \
-            /   v
-            o -> o
-
-        Each of the edges must have weight greater than 0.8.
-        """
-        hyplogging.logger.debug("Constructing migration hypergraph.")
-
-        # We start by constructing the directed graph, ignoring edges with small weight
-        t = 0.8
-        directed_adjacency_matrix[directed_adjacency_matrix < t] = 0
-        thresholded_digraph = nx.to_networkx_graph(directed_adjacency_matrix, create_using=nx.DiGraph)
-
-        # Search for the motif above
-        hyperedges = []
-        for node in thresholded_digraph.nodes:
-            # Look at pairs of out-neighbours of node
-            successors = list(thresholded_digraph.successors(node))
-            used_successors = set()
-            for i in range(len(successors)):
-                if i in used_successors:
-                    continue
-
-                for j in range(i + 1, len(successors)):
-                    if j in used_successors:
-                        continue
-                    u = successors[i]
-                    v = successors[j]
-
-                    # Look for nodes which have yet to be considered and appear as predecessors to both u and v
-                    pred_u = set(thresholded_digraph.predecessors(u))
-                    pred_v = set(thresholded_digraph.predecessors(v))
-                    pred_common = pred_u.intersection(pred_v)
-                    pred_common.remove(node)
-
-                    # If we've found a valid configuration, add it to the hypergraph and remove the relevant edges
-                    if len(pred_common) > 0:
-                        chosen_pred = random.choice(list(pred_common))
-                        hyperedges.append([node, chosen_pred, u, v])
-                        thresholded_digraph.remove_edge(node, u)
-                        thresholded_digraph.remove_edge(node, v)
-                        thresholded_digraph.remove_edge(chosen_pred, u)
-                        thresholded_digraph.remove_edge(chosen_pred, v)
-                        used_successors.add(i)
-                        used_successors.add(j)
-                        break
-
-        # Construct the final hypergraph
-        self.hypergraph = lightgraphs.LightHypergraph(hyperedges)
-        self.num_vertices = self.hypergraph.num_vertices
-        self.num_edges = self.hypergraph.num_edges
-
-    def load_data(self):
-        # We construct the directed graph from the migration data as described in the CLSZ paper.
-        hyplogging.logger.debug("Reading the adjacency matrix into a graph.")
-        all_data = loadmat('data/migration/ALL_CENSUS_DATA_FEB_2015.mat')
-        adjacency_matrix = all_data['MIG']
-        normalised_adj_mat = np.divide(adjacency_matrix, (adjacency_matrix + adjacency_matrix.T))
-        normalised_adj_mat[np.isnan(normalised_adj_mat)] = 0
-        normalised_adj_mat[np.isinf(normalised_adj_mat)] = 0
-        directed_adjacency_matrix = normalised_adj_mat - normalised_adj_mat.T
-        directed_adjacency_matrix[directed_adjacency_matrix < 0] = 0
-        self.directed_graph = nx.to_networkx_graph(directed_adjacency_matrix, create_using=nx.DiGraph)
-
-        # Construct the hypergraph
-        self.construct_motif_hypergraph(directed_adjacency_matrix)
-
-        hyplogging.logger.debug("Generating zipcodes.")
-        self.zipcodes = self.get_migration_zipcodes()
-
-    @staticmethod
-    def get_migration_zipcodes():
-        m = loadmat('data/migration/ALL_CENSUS_DATA_FEB_2015.mat')
-
-        # This is the array of latitude and longitude values for each vertex in the graph
-        lat_long = list(map(list, zip(*m['A'])))
-        long = lat_long[0]
-        lat = lat_long[1]
-
-        search = SearchEngine()
-
-        zip_codes = []
-        last_zipcode = 0
-        for v in range(len(long)):
-            result = search.by_coordinates(lat[v], long[v], returns=1)
-            if len(result) > 0:
-                zipcode = result[0].to_dict()["zipcode"]
-            else:
-                zipcode = last_zipcode
-            last_zipcode = zipcode
-            zip_codes.append(zipcode)
-
-        return zip_codes
-
-
-class WikipediaDataset(Dataset):
-    """
-    The wikipedia dataset.
-    """
-
-    def __init__(self, animal):
-        """
-        Load the dataset. Animal should be a string in ["chameleon", "crocodile", "squirrel"].
-        """
-        if animal not in ["chameleon", "crocodile", "squirrel"]:
-            raise AssertionError("Animal must be chameleon, crocodile or squirrel.")
-        self.animal = animal
-        super().__init__()
-
-    def load_data(self):
-        hyplogging.logger.info(f"Loading the wikipedia {self.animal} dataset.")
-        self.load_edgelist_and_labels(f"data/wikipedia/{self.animal}/musae_{self.animal}_edges.csv",
-                                      None, None, None, None)
-        self.is_loaded = True
-
-
 class WikipediaCategoriesDataset(Dataset):
     """
     The wikipedia categories dataset.
@@ -732,165 +435,6 @@ class WikipediaCategoriesDataset(Dataset):
                                       f"data/wikipedia-categories/{self.category_name}.gt",
                                       f"data/wikipedia-categories/{self.category_name}.clusters")
         self.is_loaded = True
-
-
-class MidDataset(Dataset):
-    """
-    The dataset object representing the dyadic MID dataset.
-    """
-
-    def __init__(self, start_date, end_date):
-        """
-        When constructing, pass the start and end dates for the data.
-
-        :param start_date:
-        :param end_date:
-        """
-        self.start_date = start_date
-        self.end_date = end_date
-        self.edgelist_filename = f"data/mid/dyadic_mid_{start_date}_{end_date}.edgelist"
-
-        # The graph, graph_hypergraph and hypergraph objects will all have the same vertex set.
-        self.graph = None
-        self.graph_hypergraph = None
-
-        # Store the mapping from the original vertex numbering to the number in the new vertex set
-        self.new_vertex_to_original = {}
-        self.original_vertex_to_new = {}
-
-        super().__init__()
-
-    def construct_simple_hypergraph(self):
-        """Using the networkx graph object constructed in self.graph, construct a corresponding simple hypergraph."""
-        if self.graph is None:
-            raise AssertionError("Must construct networkx graph before simple hypergraph.")
-
-        # Add a hyperedge for every edge
-        hyperedges = []
-        next_new_index = 0
-        for u, v, weight in self.graph.edges.data("weight"):
-            if weight is not None:
-                # Check that we have assigned indexes for both u and v
-                if u not in self.original_vertex_to_new:
-                    self.original_vertex_to_new[u] = next_new_index
-                    self.new_vertex_to_original[next_new_index] = u
-                    next_new_index += 1
-                if v not in self.original_vertex_to_new:
-                    self.original_vertex_to_new[v] = next_new_index
-                    self.new_vertex_to_original[next_new_index] = v
-                    next_new_index += 1
-
-                # Now, add the hyperedges with the new indices.
-                for j in range(int(weight)):
-                    hyperedges.append([self.original_vertex_to_new[u], self.original_vertex_to_new[v]])
-        return lightgraphs.LightHypergraph(hyperedges)
-
-    def construct_triangle_hypergraph(self):
-        """Assuming that the simple graph hypergraph has been constructed, construct the triangle motif hypergraph."""
-        if self.graph_hypergraph is None:
-            raise AssertionError("Must construct simple hypergraph before constructing triangle hypergraph.")
-
-        # Now, add edges for each triangle
-        hyperedges = self.graph_hypergraph.edges.copy()
-        all_nodes = list(self.graph.nodes)
-        for a in range(len(all_nodes)):
-            for b in range(a + 1, len(all_nodes)):
-                for c in range(b + 1, len(all_nodes)):
-                    u = all_nodes[a]
-                    v = all_nodes[b]
-                    w = all_nodes[c]
-
-                    # Check for a triangle
-                    try:
-                        weight = min(self.graph.adj[u][v]['weight'],
-                                     self.graph.adj[u][w]['weight'],
-                                     self.graph.adj[v][w]['weight'])
-                        for i in range(int(weight)):
-                            hyperedges.append([self.original_vertex_to_new[u],
-                                               self.original_vertex_to_new[v],
-                                               self.original_vertex_to_new[w]])
-                    except KeyError:
-                        pass
-        return lightgraphs.LightHypergraph(hyperedges)
-
-    def get_motif_hyperedges(self, u, v, w, x):
-        """Helper method for constructing the motif hypergraph. Given the vertices u, v, w, x, return a list of the
-        hyperedges that should be added to the graph."""
-        new_hyperedges = []
-
-        def add_split_hyperedges(a, b, c, d):
-            if b not in self.graph.adj[a] and d not in self.graph.adj[c]:
-                try:
-                    weight = min(self.graph.adj[a][c]['weight'],
-                                 self.graph.adj[a][d]['weight'],
-                                 self.graph.adj[b][c]['weight'],
-                                 self.graph.adj[b][d]['weight'])
-                    for i in range(int(weight)):
-                        new_hyperedges.append([self.original_vertex_to_new[a],
-                                               self.original_vertex_to_new[b],
-                                               self.original_vertex_to_new[c],
-                                               self.original_vertex_to_new[d]])
-                except KeyError:
-                    pass
-
-        # There are 3 partitions of (u, v, w, x) to consider
-        add_split_hyperedges(u, v, w, x)
-        add_split_hyperedges(u, w, v, x)
-        add_split_hyperedges(u, x, v, w)
-
-        return new_hyperedges
-
-    def check_motif_3_vertices(self, u, v, w):
-        """Given three vertices, check whether they could possibly form part of a motif for the motif hypergraph."""
-        # The key thing to check is that there are exactly 2 non-zero edges between these vertices.
-        num_edges = 0
-        if v in self.graph.adj[u]:
-            num_edges += 1
-        if w in self.graph.adj[u]:
-            num_edges += 1
-        if w in self.graph.adj[v]:
-            num_edges += 1
-        return num_edges == 2
-
-    def construct_bipartite_motif_hypergraph(self):
-        """Look for the following motif in the graph, and add corresponding hyperedges:
-            - vertices u, v, w, x
-            - edges u-w, u-x, v-w, v-x
-            - no edges u-v, w-x
-        """
-        if self.graph_hypergraph is None:
-            raise AssertionError("Must construct simple hypergraph before constructing motif hypergraph.")
-
-        # Now, add edges for each motif
-        hyperedges = self.graph_hypergraph.edges.copy()
-        all_nodes = list(self.graph.nodes)
-        for a in range(len(all_nodes)):
-            hyplogging.logger.debug(f"Checking edges from vertex {a}/{len(all_nodes)}")
-            u = all_nodes[a]
-            for b in range(a + 1, len(all_nodes)):
-                v = all_nodes[b]
-                for c in range(b + 1, len(all_nodes)):
-                    w = all_nodes[c]
-                    if self.check_motif_3_vertices(u, v, w):
-                        for d in range(c + 1, len(all_nodes)):
-                            x = all_nodes[d]
-                            hyperedges.extend(self.get_motif_hyperedges(u, v, w, x))
-        return lightgraphs.LightHypergraph(hyperedges)
-
-    def load_data(self):
-        """
-        Read the graph from the edgelist file. Construct a hypergraph by replacing triangles with 3-edges.
-        """
-        hyplogging.logger.info(f"Loading MID dataset from {self.edgelist_filename}")
-
-        # Construct a networkx graph from the edgelist, and extract the largest connected component.
-        full_graph = nx.read_edgelist(self.edgelist_filename, data=[("weight", int)])
-        connected_components = sorted(nx.connected_components(full_graph), key=len, reverse=True)
-        self.graph = full_graph.subgraph(connected_components[0])
-
-        # Now construct the hypergraphs from this graph
-        self.graph_hypergraph = self.construct_simple_hypergraph()
-        self.hypergraph = self.construct_bipartite_motif_hypergraph()
 
 
 class DblpDataset(Dataset):
@@ -995,34 +539,6 @@ class DblpDataset(Dataset):
                             adjacency_list[paper_id].append(file_index_to_internal[node_type][file_node_index])
 
         self.hypergraph = lightgraphs.LightHypergraph(list(adjacency_list.values()))
-        self.is_loaded = True
-
-
-class NlpDataset(Dataset):
-
-    def load_data(self):
-        """Load the NLP dataset from file"""
-        hyplogging.logger.info("Loading the NLP dataset.")
-        word_to_node_index = {}
-        next_node_index = 0
-        ignore_words = set(stopwords.words('english'))
-        edges = []
-
-        with open("data/nlp/toy-dataset-processed.txt") as f_in:
-            for line in f_in:
-                words_in_line = [word for word in line.strip().split() if word not in ignore_words]
-                new_edge = []
-
-                for word in words_in_line:
-                    if word not in word_to_node_index:
-                        word_to_node_index[word] = next_node_index
-                        self.vertex_labels.append(word)
-                        next_node_index += 1
-                    new_edge.append(word_to_node_index[word])
-                edges.append(new_edge)
-
-        # Construct the hypergraph object
-        self.hypergraph = lightgraphs.LightHypergraph(edges)
         self.is_loaded = True
 
 
@@ -1140,9 +656,6 @@ class PennTreebankDataset(Dataset):
         """Read in the dataset from the preprocessed file."""
         hyplogging.logger.info(
             f"Loading the Penn-Treebank dataset using {str(self.n) if self.n < 10000 else 'inf'}-grams.")
-        # treebank_filenames = ["data/nlp/penn-treebank/train.tsv",
-        #                       "data/nlp/penn-treebank/dev.tsv",
-        #                       "data/nlp/penn-treebank/test.tsv"]
         treebank_filenames = ["data/nlp/penn-treebank/train.tsv"]
 
         # Construct the hypergraph
@@ -1150,14 +663,11 @@ class PennTreebankDataset(Dataset):
         words_to_indices = {}
         node_degrees = []
         next_index = 0
-        swords = set(nltk.corpus.stopwords.words('english') + ['%', "n't", "'s", "mr.", 'q'])
-        swords = []
         for sentence in self.get_sentences_from_processed_treebank(treebank_filenames):
             for ngram in self.get_ngrams(sentence, stopwords=None, max_num=float('inf'), return_short_sentences=True):
                 # Keep only the words of the allowed parts of speech and not in the list of stopwords
                 filtered_ngram =\
-                    [(word.lower(), pos) for word, pos in ngram if (pos not in self.pos_to_ignore
-                     and word not in swords)]
+                    [(word.lower(), pos) for word, pos in ngram if (pos not in self.pos_to_ignore)]
 
                 # Get the gt clusters which are included in this n-gram
                 ngram_gts = [self.pos_to_cluster[pos] for _, pos in filtered_ngram]

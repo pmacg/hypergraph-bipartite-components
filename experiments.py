@@ -98,12 +98,12 @@ def sbm_experiments():
     average_over = 10
 
     # We will run a few experiments
-    rs = [3]
-    ps = [1e-7]
+    rs = [6]
+    ps = [1e-14]
     run_lps = [False]
 
     # Use the same ratios for each experiment
-    ratios = [0.5 * x for x in range(61, 101)]
+    ratios = [0.5 * x for x in range(13, 61)]
 
     # Whether to append results to the results files
     append_results = True
@@ -587,14 +587,14 @@ def induced_graph_demo():
 
 if __name__ == "__main__":
     # Real-world experiments
+    # treebank_experiment()
+    # dblp_experiment()
     # wikipedia_categories_experiment()
     # actor_director_experiment()
-    # dblp_experiment()
-    # treebank_experiment()
 
     # Synthetic experiments
-    sbm_experiments()
+    # sbm_experiments()
     # sbm_runtime_experiment(1000, 5, 1e-9)
 
     # Demonstration to help build the figures in the paper.
-    # induced_graph_demo()
+    induced_graph_demo()

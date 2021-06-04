@@ -1,10 +1,9 @@
+pandas~=1.1.5
 numpy~=1.19.4
-hypernetx~=0.3.7
-matplotlib~=3.3.3
 scipy~=1.5.4
 networkx~=2.5
-pandas~=1.1.5
-clsz==0.2.0
-pycheeg==0.1.0
-uszipcode~=0.2.5
+matplotlib~=3.3.3
+hypernetx~=0.3.7
 nltk~=3.6.2
+uszipcode~=0.2.5
+clsz~=0.2.0
