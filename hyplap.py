@@ -385,48 +385,6 @@ def hypergraph_measure_laplacian(phi, hypergraph, debug=False):
     return -hypergraph_degree_mat(hypergraph) @ r
 
 
-def hypergraph_lap_conn_graph(phi, hypergraph):
-    """
-    Given a current vector in the measure space, return a graph object demonstrating the basic connectivity of the
-    underlying laplacian graph. (For now, I don't actually compute the weights on this graph fully)
-    :param phi: A vector in the measure space
-    :param hypergraph: The underlying hypergraph
-    :return: A networkx graph object
-    """
-    f = measure_to_weighted(phi, hypergraph)
-
-    # We will round the vector f to a small(ish) precision so as to
-    # avoid vertices ending in the wrong equivalence classes due to numerical errors.
-    f = np.round(f, decimals=5)
-
-    edge_info = compute_edge_info(f, hypergraph)
-    new_graph = nx.Graph()
-
-    # Add the vertices
-    for vertex in hypergraph.nodes:
-        new_graph.add_node(vertex)
-
-    # Add the edges
-    for e, e_info in edge_info.items():
-        for u in e_info[0]:
-            for vertex in e_info[1]:
-                new_graph.add_edge(u, vertex)
-
-    return new_graph
-
-
-def hyp_plot_conn_graph(phi, hypergraph, show_hyperedges=True):
-    """
-    Plot the pagerank connectivity graph along with the hypergraph.
-    :param phi:
-    :param hypergraph:
-    :param show_hyperedges: Whether to plot the hyperedges as well as the connection edges.
-    :return:
-    """
-    connection_graph = hypergraph_lap_conn_graph(phi, hypergraph)
-    hyp_plot_with_graph(connection_graph, hypergraph, show_hyperedges=show_hyperedges)
-
-
 def hyp_plot_with_graph(graph, hypergraph, show_hyperedges=True, plot_graph_weights=False):
     """
     Plot a hypergraph with a simple graph on the same vertex set.

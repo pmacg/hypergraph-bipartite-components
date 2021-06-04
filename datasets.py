@@ -19,7 +19,6 @@ class Dataset(object):
 
     def __init__(self):
         # Track whether the data has been loaded yet
-        self.is_loaded = False
         self.hypergraph = None
         self.num_vertices = 0
         self.num_edges = 0
@@ -412,8 +411,6 @@ class ActorDirectorDataset(Dataset):
         self.gt_clusters = vertex_gt
         self.cluster_labels = ["director", "actor"]
 
-        self.is_loaded = True
-
 
 class WikipediaCategoriesDataset(Dataset):
     """
@@ -431,7 +428,6 @@ class WikipediaCategoriesDataset(Dataset):
                                       f"data/wikipedia-categories/{self.category_name}.edges",
                                       f"data/wikipedia-categories/{self.category_name}.gt",
                                       f"data/wikipedia-categories/{self.category_name}.clusters")
-        self.is_loaded = True
 
 
 class DblpDataset(Dataset):
@@ -536,7 +532,6 @@ class DblpDataset(Dataset):
                             adjacency_list[paper_id].append(file_index_to_internal[node_type][file_node_index])
 
         self.hypergraph = lightgraphs.LightHypergraph(list(adjacency_list.values()))
-        self.is_loaded = True
 
 
 class PennTreebankDataset(Dataset):
@@ -689,7 +684,6 @@ class PennTreebankDataset(Dataset):
         nodes_to_remove = [node for node in range(len(node_degrees)) if (node_degrees[node] < self.min_degree or
                                                                          node_degrees[node] > self.max_degree)]
         self.remove_nodes(nodes_to_remove, remove_edges=True)
-        self.is_loaded = True
 
 
 class SbmDataset(Dataset):
@@ -721,6 +715,3 @@ class SbmDataset(Dataset):
         # Set the cluster information
         self.cluster_labels = ["Left Set", "Right Set"]
         self.gt_clusters = ([0] * self.n) + ([1] * self.n)
-
-        self.is_loaded = True
-

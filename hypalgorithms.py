@@ -90,7 +90,7 @@ def find_bipartite_set_diffusion(hypergraph, max_time=100, step_size=0.1, use_ra
         l_clique = hypjop.graph_diffusion_operator(weighted_clique_graph)
 
         # Compute the eigenvector corresponding to the smallest eigenvalue
-        eigenvalues, eigenvectors = sp.sparse.linalg.eigs(l_clique, k=1, which='SM')
+        _, eigenvectors = sp.sparse.linalg.eigs(l_clique, k=1, which='SM')
         s = eigenvectors[:, 0]
 
         return _internal_bipartite_diffusion(s, hypergraph, max_time, step_size, approximate,
@@ -309,7 +309,7 @@ def find_bipartite_set_clique(hypergraph):
 
     # Compute the eigenvector corresponding to the smallest eigenvalue
     hyplogging.logger.debug("Computing the eigenvalues and eigenvectors.")
-    eigenvalues, eigenvectors = sp.sparse.linalg.eigs(l_clique, k=1, which='SM')
+    _, eigenvectors = sp.sparse.linalg.eigs(l_clique, k=1, which='SM')
     x = eigenvectors[:, 0]
 
     # Run the two-sided sweep set algorithm on this eigenvector
