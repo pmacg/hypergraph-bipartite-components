@@ -32,7 +32,14 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
     clique_hyp_vol = hypcheeg.hypergraph_volume(sbm_dataset.hypergraph, vertex_set_l + vertex_set_r)
     clique_clique_bipart = clique_graph.bipartiteness(vertex_set_l, vertex_set_r)
     clique_clique_vol = clique_graph.volume(vertex_set_l + vertex_set_r)
-    results.extend([clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, clique_clique_vol, clique_execution_time])
+
+    # Compute the f1 score for this clustering
+    _, _, f1_left = sbm_dataset.compute_clustering_stats([vertex_set_l, vertex_set_r], 0)
+    _, _, f1_right = sbm_dataset.compute_clustering_stats([vertex_set_l, vertex_set_r], 1)
+    f1_score = max(f1_left, f1_right)
+
+    results.extend([clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, clique_clique_vol, clique_execution_time,
+                    f1_score])
 
     # Run the exact diffusion algorithm if required
     if run_lp:
@@ -44,7 +51,13 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
         diff_hyp_vol = hypcheeg.hypergraph_volume(sbm_dataset.hypergraph, vertex_set_l + vertex_set_r)
         diff_clique_bipart = clique_graph.bipartiteness(vertex_set_l, vertex_set_r)
         diff_clique_vol = clique_graph.volume(vertex_set_l + vertex_set_r)
-        results.extend([diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, diff_clique_vol, diff_execution_time])
+
+        # Compute the f1 score for this clustering
+        _, _, f1_left = sbm_dataset.compute_clustering_stats([vertex_set_l, vertex_set_r], 0)
+        _, _, f1_right = sbm_dataset.compute_clustering_stats([vertex_set_l, vertex_set_r], 1)
+        f1_score = max(f1_left, f1_right)
+        results.extend([diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, diff_clique_vol, diff_execution_time,
+                        f1_score])
 
     # Run the approximate diffusion algorithm
     hyplogging.logger.info("Running the approximate diffusion algorithm.")
@@ -55,8 +68,11 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
     approx_diff_hyp_vol = hypcheeg.hypergraph_volume(sbm_dataset.hypergraph, vertex_set_l + vertex_set_r)
     approx_diff_clique_bipart = clique_graph.bipartiteness(vertex_set_l, vertex_set_r)
     approx_diff_clique_vol = clique_graph.volume(vertex_set_l + vertex_set_r)
+    _, _, f1_left = sbm_dataset.compute_clustering_stats([vertex_set_l, vertex_set_r], 0)
+    _, _, f1_right = sbm_dataset.compute_clustering_stats([vertex_set_l, vertex_set_r], 1)
+    f1_score = max(f1_left, f1_right)
     results.extend([approx_diff_hyp_bipart, approx_diff_hyp_vol, approx_diff_clique_bipart, approx_diff_clique_vol,
-                    approx_diff_execution_time])
+                    approx_diff_execution_time, f1_score])
 
     return results
 
@@ -92,15 +108,15 @@ def sbm_experiments():
     average_over = 10
 
     # We will run a few experiments
-    rs = [6]
-    ps = [1e-14]
+    rs = [5]
+    ps = [1e-11]
     run_lps = [False]
 
     # Use the same ratios for each experiment
-    ratios = [0.5 * x for x in range(13, 61)]
+    ratios = [0.5 * x for x in range(50, 61)]
 
     # Whether to append results to the results files
-    append_results = True
+    append_results = False
 
     for index in range(len(rs)):
         sbm_experiment_internal(n, rs[index], ps[index], average_over, run_lps[index], ratios, append_results)
@@ -112,22 +128,24 @@ def sbm_experiment_internal(n, r, p, average_over, run_lp, ratios, append_result
         # Write the header line of the average results file
         if not append_results:
             average_file.write("n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
-                               "clique_clique_vol, clique_runtime, "
+                               "clique_clique_vol, clique_runtime, clique_f1, "
                                f"{'diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, ' if run_lp else ''}"
-                               f"{'diff_clique_vol, diff_runtime, ' if run_lp else ''}"
+                               f"{'diff_clique_vol, diff_runtime, diff_f1, ' if run_lp else ''}"
                                "approx_diff_hyp_bipart, approx_diff_hyp_vol, "
-                               "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime\n")
+                               "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime, "
+                               "approx_diff_f1\n")
 
         with open(f"data/sbm/results/two_cluster_results_{n}_{r}_{p}.csv", mode) as results_file:
             # Write the header line of the file
             if not append_results:
                 results_file.write(
                     "run_id, n, r, p, q, ratio, clique_hyp_bipart, clique_hyp_vol, clique_clique_bipart, "
-                    "clique_clique_vol, clique_runtime, "
+                    "clique_clique_vol, clique_runtime, clique_f1, "
                     f"{'diff_hyp_bipart, diff_hyp_vol, diff_clique_bipart, ' if run_lp else ''}"
-                    f"{'diff_clique_vol, diff_runtime, ' if run_lp else ''}"
+                    f"{'diff_clique_vol, diff_runtime, diff_f1, ' if run_lp else ''}"
                     "approx_diff_hyp_bipart, approx_diff_hyp_vol, "
-                    "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime\n")
+                    "approx_diff_clique_bipart, approx_diff_clique_vol, approx_diff_runtime, "
+                    "approx_diff_f1\n")
 
             # We will consider the following ratios of q/p
             run_id = 0

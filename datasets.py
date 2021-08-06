@@ -229,9 +229,12 @@ class Dataset(object):
         bottom_row = construct_row_string([''] + gt_cluster_totals + [''])
         hyplogging.logger.info(bottom_row)
 
-    def show_clustering_stats(self, clusters):
+    def compute_confusion_matrix(self, clusters):
         """
-        Given a list of clusters produced by some algorithm, report the key statistics for reporting.
+        Given a candidate clustering, compute the confusion matrix with the ground truth clusters.
+        :param clusters: The candidate clusters.
+        :return: The confusion matrix as a list of lists, the total size of each ground truth cluster as a list,
+                 and the total number of correctly classified vertices
         """
         # Given the id of a ground truth cluster and a list of vertex indices, count the number of vertices in the
         # cluster which are in the corresponding ground truth cluster.
@@ -239,7 +242,6 @@ class Dataset(object):
             gt_cluster = set([node for node in range(len(self.gt_clusters)) if self.gt_clusters[node] == gt_id])
             return len([node for node in candidate_cluster if node in gt_cluster])
 
-        # Construct the confusion matrix
         confusion_matrix = []
         gt_cluster_totals = [0] * len(self.cluster_labels)
         total_correctly_classified = 0
@@ -251,43 +253,73 @@ class Dataset(object):
             # Update the cluster totals
             gt_cluster_totals = [gt_cluster_totals[i] + overlaps[i] for i in range(len(self.cluster_labels))]
 
+        return confusion_matrix, gt_cluster_totals, total_correctly_classified
+
+    def compute_clustering_stats(self, clusters, cluster_id, confusion_matrix=None, gt_cluster_sizes=None):
+        """
+        Given a list of clusters produced by some algorithm, compute the precision, recall, and f1 scores for one of the
+        ground truth clusters.
+
+        :param clusters: The candidate clustering
+        :param cluster_id: Which ground truth cluster to compute the stats for
+        :param confusion_matrix: Optionally, provide the precomputed confusion matrix
+        :param gt_cluster_sizes: Optionally, provide the precomputed sizes of the ground truth clusters
+        :return: precision, recall, f1
+        """
+        if confusion_matrix is None or gt_cluster_sizes is None:
+            confusion_matrix, gt_cluster_sizes, _ = self.compute_confusion_matrix(clusters)
+
+        # Check the precision and recall given by each found cluster, and report the best
+        best_precision = 0
+        best_recall = 0
+        for found_cluster_id in range(len(clusters)):
+            # Compute the precision
+            if sum(confusion_matrix[found_cluster_id]) > 0:
+                precision = confusion_matrix[found_cluster_id][cluster_id] / sum(confusion_matrix[found_cluster_id])
+            else:
+                precision = 0
+
+            # Compute the recall
+            if gt_cluster_sizes[cluster_id] > 0:
+                recall = confusion_matrix[found_cluster_id][cluster_id] / gt_cluster_sizes[cluster_id]
+            else:
+                recall = 0
+
+            # Update the best stats
+            if precision > best_precision:
+                best_precision = precision
+            if recall > best_recall:
+                best_recall = recall
+
+        # Compute the f1 score
+        f1_score = 2 / ((1 / best_recall) + (1 / best_precision))
+
+        # And return
+        return best_precision, best_recall, f1_score
+
+    def show_clustering_stats(self, clusters):
+        """
+        Given a list of clusters produced by some algorithm, report the key statistics for reporting.
+        """
+        # Construct the confusion matrix
+        confusion_matrix, gt_cluster_sizes, total_correctly_classified = self.compute_confusion_matrix(clusters)
+
         # For each GT cluster, print the precision and recall
         for cluster_id in range(len(self.cluster_labels)):
             hyplogging.logger.info(f"Cluster: {self.cluster_labels[cluster_id]}")
 
-            # Check the precision and recall given by each found cluster, and report the best
-            best_precision = 0
-            best_recall = 0
-            for found_cluster_id in range(len(clusters)):
-                # Compute the precision
-                if sum(confusion_matrix[found_cluster_id]) > 0:
-                    precision = confusion_matrix[found_cluster_id][cluster_id] / sum(confusion_matrix[found_cluster_id])
-                else:
-                    precision = 0
+            precision, recall, f1_score = self.compute_clustering_stats(clusters, cluster_id,
+                                                                        confusion_matrix=confusion_matrix,
+                                                                        gt_cluster_sizes=gt_cluster_sizes)
 
-                # Compute the recall
-                if gt_cluster_totals[cluster_id] > 0:
-                    recall = confusion_matrix[found_cluster_id][cluster_id] / gt_cluster_totals[cluster_id]
-                else:
-                    recall = 0
-
-                # Update the best stats
-                if precision > best_precision:
-                    best_precision = precision
-                if recall > best_recall:
-                    best_recall = recall
-
-            # Compute the f1 score
-            f1_score = 2 / ((1/best_recall) + (1/best_precision))
-
-            hyplogging.logger.info(f"    Precision: {best_precision}")
-            hyplogging.logger.info(f"       Recall: {best_recall}")
+            hyplogging.logger.info(f"    Precision: {precision}")
+            hyplogging.logger.info(f"       Recall: {recall}")
             hyplogging.logger.info(f"           F1: {f1_score}")
 
         # Print the overall Accuracy
-        accuracy = total_correctly_classified / sum(gt_cluster_totals)
+        accuracy = total_correctly_classified / sum(gt_cluster_sizes)
         hyplogging.logger.info(f"Accuracy:")
-        hyplogging.logger.info(f"  {total_correctly_classified} / {sum(gt_cluster_totals)} = {accuracy}")
+        hyplogging.logger.info(f"  {total_correctly_classified} / {sum(gt_cluster_sizes)} = {accuracy}")
 
     def show_large_and_small_degree_vertices(self):
         """
