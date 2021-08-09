@@ -77,13 +77,13 @@ def run_single_sbm_experiment(sbm_dataset, run_lp=False):
     return results
 
 
-def sbm_runtime_experiment(n, r, p):
+def sbm_runtime_experiment(n, r, p, qp_ratio=2):
     """
     Compute the average runtime for the given parameters of graph. Print the output to screen - no need for CSV
     fancy-ness.
     """
     # Fix the ratio q = 2 * p
-    q = 2 * p
+    q = qp_ratio * p
 
     # Compute the average performance over 10 runs
     all_results = []
@@ -97,8 +97,9 @@ def sbm_runtime_experiment(n, r, p):
 
     # Display the average results
     average_results = list(map(statistics.mean, transpose_lists(all_results)))
-    hyplogging.logger.info(f"n = {n}, r = {r}, p = {p}, edges = {average_results[-1]}, "
-                           f"diff_runtime = {average_results[9]}, clique_runtime = {average_results[4]}")
+    hyplogging.logger.info(f"n = {n}, r = {r}, p = {p}, q/p = {qp_ratio}, edges = {average_results[-1]}, "
+                           f"diff_runtime = {average_results[10]}, clique_runtime = {average_results[4]}, "
+                           f"diff_f1 = {average_results[11]}, clique_f1 = {average_results[5]}")
 
 
 def sbm_experiments():
@@ -113,10 +114,10 @@ def sbm_experiments():
     run_lps = [False]
 
     # Use the same ratios for each experiment
-    ratios = [0.5 * x for x in range(50, 61)]
+    ratios = [0.5 * x for x in range(30, 50)]
 
     # Whether to append results to the results files
-    append_results = False
+    append_results = True
 
     for index in range(len(rs)):
         sbm_experiment_internal(n, rs[index], ps[index], average_over, run_lps[index], ratios, append_results)
@@ -330,7 +331,8 @@ def treebank_experiment():
                                                   algorithm='diffusion'):
         treebank_dataset.log_confusion_matrix([left, right])
         treebank_dataset.show_clustering_stats([left, right])
-        hyplogging.logger.info(f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
+        hyplogging.logger.info(
+            f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
 
     hyplogging.logger.info("")
 
@@ -340,4 +342,9 @@ def treebank_experiment():
                                                   algorithm='clique'):
         treebank_dataset.log_confusion_matrix([left, right])
         treebank_dataset.show_clustering_stats([left, right])
-        hyplogging.logger.info(f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
+        hyplogging.logger.info(
+            f"Bipartiteness: {hypcheeg.hypergraph_bipartiteness(treebank_dataset.hypergraph, left, right)}")
+
+
+if __name__ == "__main__":
+    sbm_runtime_experiment(1000, 5, 1e-11, qp_ratio=30)

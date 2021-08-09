@@ -292,7 +292,10 @@ class Dataset(object):
                 best_recall = recall
 
         # Compute the f1 score
-        f1_score = 2 / ((1 / best_recall) + (1 / best_precision))
+        if best_recall == 0 or best_precision == 0:
+            f1_score = 0
+        else:
+            f1_score = 2 / ((1 / best_recall) + (1 / best_precision))
 
         # And return
         return best_precision, best_recall, f1_score
