@@ -114,10 +114,10 @@ def sbm_experiments():
     run_lps = [False]
 
     # Use the same ratios for each experiment
-    ratios = [0.5 * x for x in range(30, 50)]
+    ratios = [0.5 * x for x in range(4, 60)]
 
     # Whether to append results to the results files
-    append_results = True
+    append_results = False
 
     for index in range(len(rs)):
         sbm_experiment_internal(n, rs[index], ps[index], average_over, run_lps[index], ratios, append_results)
@@ -347,4 +347,4 @@ def treebank_experiment():
 
 
 if __name__ == "__main__":
-    sbm_runtime_experiment(1000, 5, 1e-11, qp_ratio=30)
+    sbm_experiments()
