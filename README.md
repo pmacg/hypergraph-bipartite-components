@@ -1,5 +1,5 @@
 # Finding Bipartite Components in Hypergraphs
-This repository contains code to accompany the paper "Finding Bipartite Components in Hypergraph", published in NeurIPS 2021.
+This repository contains code to accompany the paper "Finding Bipartite Components in Hypergraphs", published in NeurIPS 2021.
 It provides an implementation of the proposed algorithm based on the new hypergraph diffusion process,
 as well as the baseline algorithm based on the clique reduction.
 
