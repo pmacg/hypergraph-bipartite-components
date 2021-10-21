@@ -114,7 +114,7 @@ def sbm_experiments():
     run_lps = [False]
 
     # Use the same ratios for each experiment
-    ratios = [0.5 * x for x in range(4, 60)]
+    ratios = [0.5 * x for x in range(4, 61)]
 
     # Whether to append results to the results files
     append_results = False

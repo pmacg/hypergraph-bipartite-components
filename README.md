@@ -1,10 +1,12 @@
 # Finding Bipartite Components in Hypergraphs
-This repository contains code to accompany the paper "Finding Bipartite Components in Hypergraph".
+This repository contains code to accompany the paper "Finding Bipartite Components in Hypergraph", published in NeurIPS 2021.
 It provides an implementation of the proposed algorithm based on the new hypergraph diffusion process,
 as well as the baseline algorithm based on the clique reduction.
 
 Below, you can find instructions for running the code which will reproduce the results reported
 in the paper.
+
+Feel free to contact me with any questions or comments at `peter.macgregor@ed.ac.uk`.
 
 ## Set-up
 The code was written to work with Python 3.6, although other versions of Python 3 
@@ -22,7 +24,7 @@ constructed at each step by running
 ```bash
 python show_visualisation.py
 ```
-This example was used to create Figure 1 in the main paper.
+This example was used to create Figure 1 in the paper.
 
 ## Experiments
 In this section, we give instructions for running the experiments reported in the paper.
